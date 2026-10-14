@@ -88,7 +88,8 @@ const now = () => Date.now();
 
 let state = load() || {tasks: [], lists: [], events: []};
 let view = {month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), sel: todayStr()};
-let token = null, exp = 0, tc = null, fileId = null, status = 'offline', signedIn = !!localStorage.getItem('dash-in');
+let token = null, exp = 0, tc = null, fileId = null, status = 'offline', signedIn = false;
+const known = () => !!localStorage.getItem('dash-in');
 let saveTimer = null, busy = false;
 
 function load() { try { return JSON.parse(localStorage.getItem('dash-cache')); } catch (e) { return null; } }
@@ -108,17 +109,18 @@ const merge = (a, b) => ({tasks: mergeArr(a.tasks, b.tasks), lists: mergeArr(a.l
 function initAuth() {
   if (!window.google || !google.accounts) return setTimeout(initAuth, 200);
   tc = google.accounts.oauth2.initTokenClient({client_id: CLIENT_ID, scope: SCOPE, callback: () => {}});
-  if (signedIn) connect(''); else render();
+  try { const k = JSON.parse(localStorage.getItem('dash-tok')); if (k && k.exp > now()) { token = k.t; exp = k.exp; signedIn = true; pull(true); startPolling(); return; } } catch (e) {}
+  render();
 }
 function getToken(prompt) {
   return new Promise((res, rej) => {
-    tc.callback = r => { if (r.error) return rej(r); token = r.access_token; exp = now() + (r.expires_in - 60) * 1000; res(token); };
+    tc.callback = r => { if (r.error) return rej(r); token = r.access_token; exp = now() + (r.expires_in - 60) * 1000; try { localStorage.setItem('dash-tok', JSON.stringify({t: token, exp})); } catch (e) {} res(token); };
     tc.error_callback = e => rej(e);
     tc.requestAccessToken({prompt});
   });
 }
 async function api(url, opts = {}, retry = true) {
-  if (!token || now() > exp) await getToken('');
+  if (!token || now() > exp) { token = null; signedIn = false; status = 'offline'; render(); throw new Error('expired'); }
   const r = await fetch(url, {...opts, headers: {...(opts.headers || {}), Authorization: 'Bearer ' + token}});
   if (r.status === 401 && retry) { token = null; return api(url, opts, false); }
   if (!r.ok) throw new Error('Drive ' + r.status);
@@ -130,7 +132,7 @@ async function connect(prompt) {
     localStorage.setItem('dash-in', '1'); signedIn = true;
     await pull(true);
     startPolling();
-  } catch (e) { status = 'offline'; signedIn = false; localStorage.removeItem('dash-in'); render(); }
+  } catch (e) { status = 'offline'; signedIn = false; render(); toast('Sign-in did not finish. Tap Sign in to try again.'); }
 }
 async function findFile() {
   const q = encodeURIComponent("name='" + FILE + "'");
@@ -157,7 +159,7 @@ async function pull(first) {
     if (remote) { const before = JSON.stringify(state); state = merge(state, remote); if (first || JSON.stringify(state) !== before) { cache(); } }
     if (!remote || JSON.stringify(state) !== JSON.stringify(remote)) await writeRemote(state);
     status = 'synced'; render();
-  } catch (e) { status = 'error'; render(); }
+  } catch (e) { status = signedIn ? 'error' : 'offline'; render(); }
   busy = false;
 }
 function startPolling() {
@@ -188,7 +190,7 @@ function todayProgress() {
 
 /* ---------- render ---------- */
 function render(soft) {
-  if (!signedIn) {
+  if (!signedIn && !known()) {
     $app.innerHTML = `<div class="gate"><h1>My dashboard</h1><p class="empty">Sign in with Google to load your data from your own Drive. Nothing is stored anywhere else.</p><button class="btn" data-a="signin">Sign in with Google</button></div>`;
     return;
   }
@@ -200,7 +202,7 @@ function render(soft) {
   <header>
     <div class="ring">${ring(pct, 96, 9)}<b>${p.tot ? Math.round(pct * 100) + '%' : '–'}</b></div>
     <div class="hd"><h1>${d.toLocaleDateString(undefined, {weekday: 'long'})}</h1><p>${d.toLocaleDateString(undefined, {month: 'long', day: 'numeric'})} · ${p.tot ? p.done + ' of ' + p.tot + ' done today' : 'Nothing due today'}</p></div>
-    <div class="sync"><span id="sync">${statusText()}</span><br><button class="ghost" data-a="sync">Sync now</button><button class="ghost" data-a="backup">Back up</button></div>
+    <div class="sync"><span id="sync">${statusText()}</span><br>${signedIn ? '<button class="ghost" data-a="sync">Sync now</button>' : '<button class="btn" data-a="signin">Sign in to sync</button>'}<button class="ghost" data-a="backup">Back up</button></div>
   </header>
   <main>
     <div>${calendar()}</div>
@@ -208,7 +210,7 @@ function render(soft) {
   </main>`;
   if (focus) { const el = $app.querySelector(`[name="${focus}"]`); if (el) el.focus(); }
 }
-const statusText = () => ({synced: 'Synced', syncing: 'Syncing…', saving: 'Saving…', error: 'Sync failed, will retry', offline: 'Offline'}[status]);
+const statusText = () => ({synced: 'Synced', syncing: 'Syncing…', saving: 'Saving…', error: 'Sync failed, will retry', offline: 'Not synced'}[status]);
 
 function calendar() {
   const m = view.month, y = m.getFullYear(), mo = m.getMonth(), t = todayStr();
@@ -258,7 +260,7 @@ $app.addEventListener('click', e => {
   const a = b.dataset.a, v = b.dataset.v, u = now();
   const task = () => state.tasks.find(x => x.id === v);
   const list = () => state.lists.find(x => x.id === b.dataset.l);
-  if (a === 'signin') return connect('consent');
+  if (a === 'signin') return connect(known() ? '' : 'consent');
   if (a === 'sync') return pull(true);
   if (a === 'backup') return backup();
   if (a === 'pick') { view.sel = v; return render(); }
