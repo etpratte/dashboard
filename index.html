@@ -7,9 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef1f4;--panel:#fff;--ink:#1b2430;--mute:#66727f;--line:#d9dfe5;--acc:#0f766e;--accsoft:#d5ece9;--warn:#b4432f;
+:root{--bg:#eef1f4;--panel:#fff;--ink:#1b2430;--mute:#66727f;--line:#d9dfe5;--acc:#2563eb;--accsoft:#dbe6fb;--warn:#b4432f;
 --serif:'Newsreader',Georgia,serif;--sans:'DM Sans',system-ui,-apple-system,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#12171d;--panel:#1a212a;--ink:#e6ebf0;--mute:#8d9aa8;--line:#2b3541;--acc:#5ec4b6;--accsoft:#1f3a38;--warn:#e58a76}}
+@media (prefers-color-scheme:dark){:root{--bg:#12171d;--panel:#1a212a;--ink:#e6ebf0;--mute:#8d9aa8;--line:#2b3541;--acc:#7aa9ff;--accsoft:#1e2b47;--warn:#e58a76}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--sans);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -94,6 +94,17 @@ input[type=number],.sm{flex:none;width:76px;background:var(--bg);border:1px soli
 .chk.on{background:var(--acc);border-color:var(--acc)}
 .chk.on::after{content:"";width:6px;height:11px;border:solid var(--bg);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
 .hring{display:flex;align-items:center;gap:12px}.foot{margin-top:24px;text-align:center}
+.tgw{overflow-x:auto}.tg.wide{min-width:600px}
+.tgr{display:grid;grid-template-columns:48px repeat(var(--n),minmax(0,1fr))}
+.tgd{padding:6px 2px;text-align:center;font-weight:500;border-radius:6px}.tgd.today{color:var(--acc)}.tgd:hover{background:var(--accsoft)}
+.tgl{font-size:11px;color:var(--mute);padding:4px 4px 0 0}
+.tgr.ad{border-bottom:1px solid var(--line);margin-bottom:4px;min-height:24px}
+.tgc{padding:2px;border-left:1px solid var(--line)}
+.tgut{position:relative}.tgut span{position:absolute;right:6px;transform:translateY(-50%);font-size:11px;color:var(--mute)}.tgut span:first-child{transform:none}
+.tcol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% 44px}
+.blk{position:absolute;overflow:hidden;box-sizing:border-box;padding:2px 4px;font-size:11px;line-height:1.25;border-radius:6px;border:1px solid var(--bg)}
+.blk b{font-weight:600}.blk.once{background:var(--acc);color:var(--bg)}.blk.rec{background:var(--accsoft);color:var(--ink);border-left:3px solid var(--acc)}
+@media(max-width:600px){.tgc .chip{width:auto;height:auto;font-size:10px;padding:1px 3px;border-radius:4px}}
 </style>
 </head>
 <body>
@@ -113,7 +124,7 @@ const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0
 const todayStr = () => ymd(new Date());
 const now = () => Date.now();
 
-let state = norm(load() || {});
+let state = {};
 let view = {tab: localStorage.getItem('dash-tab') || 'home', mode: 'month', cur: new Date()};
 let token = null, exp = 0, tc = null, fileId = null, status = 'offline', signedIn = false;
 const known = () => !!localStorage.getItem('dash-in');
@@ -130,7 +141,7 @@ function mergeArr(a = [], b = [], nested) {
   if (nested) m.forEach((v, k) => { const o1 = a.find(z => z.id === k), o2 = b.find(z => z.id === k); v.items = mergeArr(o1 && o1.items, o2 && o2.items); });
   return [...m.values()];
 }
-const merge = (a, b) => { a = norm({...a}); b = norm({...b}); return norm({...b, ...a, tasks: mergeArr(a.tasks, b.tasks), habits: mergeArr(a.habits, b.habits), sched: {once: pick(a.sched.once, b.sched.once), rec: pick(a.sched.rec, b.sched.rec), bday: pick(a.sched.bday, b.sched.bday)}}); };
+const merge = (a, b) => { a = norm({...a}); b = norm({...b}); const sched = {}; LISTS.forEach(k => { sched[k] = pick(a.sched[k], b.sched[k]); }); return norm({...b, ...a, sched}); };
 
 /* ---------- Google auth + Drive ---------- */
 function initAuth() {
@@ -211,10 +222,19 @@ const fmtD = (d, y) => d.toLocaleDateString(undefined, y ? {month: 'short', day:
 const fmtL = d => d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'});
 const fts = ts => { const d = new Date(ts); return fmtD(d, d.getFullYear() !== new Date().getFullYear()); };
 const ft = n => { const h = Math.floor(n / 60), m = n % 60; return ((h + 11) % 12 + 1) + (m ? ':' + pad(m) : '') + (h < 12 ? 'am' : 'pm'); };
+const LISTS = ['once', 'rec', 'bday', 'todo', 'habit'];
+const lineD = ts => { const d = new Date(ts); return cap(MON[d.getMonth()]) + ' ' + d.getDate() + ' ' + d.getFullYear(); };
 function norm(s) {
-  s.tasks = (s.tasks || []).map(t => { if (t.c == null) t.c = t.u || 0; if (t.k == null) t.k = t.done ? (t.u || 0) : 0; return t; });
-  s.habits = s.habits || []; s.sched = s.sched || {};
-  ['once', 'rec', 'bday'].forEach(k => { s.sched[k] = s.sched[k] || {t: '', u: 0}; });
+  s.sched = s.sched || {};
+  LISTS.forEach(k => { s.sched[k] = s.sched[k] || {t: '', u: 0}; });
+  if (s.tasks) {
+    if (!s.sched.todo.t) s.sched.todo = {t: s.tasks.filter(t => !t.del).sort((a, b) => (a.c || a.u || 0) - (b.c || b.u || 0)).map(t => { const c = t.c || t.u, k = t.k != null ? t.k : (t.done ? t.u : 0); return (k ? '### ' : '') + (c ? lineD(c) + ' ' : '') + (k ? '> ' + lineD(k) + ' ' : '') + t.t; }).join('\n'), u: 1};
+    delete s.tasks;
+  }
+  if (s.habits) {
+    if (!s.sched.habit.t) s.sched.habit = {t: s.habits.filter(h => !h.del).map(h => h.name + ' | ' + Object.keys(h.days || {}).sort().join(', ')).join('\n'), u: 1};
+    delete s.habits;
+  }
   return s;
 }
 const pick = (x, y) => ((x && x.u) || 0) >= ((y && y.u) || 0) ? x : y;
@@ -257,14 +277,31 @@ function pBday(l) {
   const mo = MON.indexOf(m[1].toLowerCase()), d = +m[2]; if (mo < 0 || !dateOk(2024, mo, d)) return null;
   return {m: mo, d, y: m[3] ? +m[3] : 0, t: m[4].trim()};
 }
+const DT = /^([a-z]{3})[a-z]*\.?\s+(\d{1,2})\s+(\d{4})(?:\s+|$)/i;
+function pDate(r) { const m = DT.exec(r); if (!m) return null; const mo = MON.indexOf(m[1].toLowerCase()), y = +m[3], d = +m[2]; return mo < 0 || !dateOk(y, mo, d) ? null : {ts: new Date(y, mo, d).getTime(), n: m[0].length}; }
+function pTodo(l) {
+  let r = l, k = false, c = null, kd = null, m;
+  if (r.startsWith('###')) { k = true; r = r.slice(3).trim(); }
+  if ((m = pDate(r))) { c = m.ts; r = r.slice(m.n); }
+  if ((m = /^>\s*/.exec(r))) { r = r.slice(m[0].length); if ((m = pDate(r))) { kd = m.ts; r = r.slice(m.n); } }
+  r = r.trim(); return r ? {k, c, kd, t: r} : null;
+}
+function pHabit(l) {
+  const i = l.lastIndexOf('|'), name = (i < 0 ? l : l.slice(0, i)).trim(), days = {};
+  if (i >= 0) l.slice(i + 1).split(/[\s,]+/).forEach(x => { if (/^\d{4}-\d{2}-\d{2}$/.test(x)) days[x] = 1; });
+  return name ? {name, days} : null;
+}
 let memo = {k: '', v: null};
 function getSched() {
-  const s = state.sched, k = s.once.t + '\u0001' + s.rec.t + '\u0001' + s.bday.t; if (memo.k === k) return memo.v;
-  const out = {once: [], rec: [], bday: [], errs: {once: [], rec: [], bday: []}}, fns = {once: pOnce, rec: pRec, bday: pBday};
-  for (const key of ['once', 'rec', 'bday']) s[key].t.split('\n').forEach((raw, i) => {
-    const l = raw.trim(); if (!l || l[0] === '#') return;
-    const r = fns[key](l); if (r) out[key].push(r); else out.errs[key].push([i + 1, l]);
-  });
+  const s = state.sched, k = LISTS.map(x => s[x].t).join('\u0001'); if (memo.k === k) return memo.v;
+  const out = {errs: {}}, fns = {once: pOnce, rec: pRec, bday: pBday, todo: pTodo, habit: pHabit};
+  for (const key of LISTS) {
+    out[key] = []; out.errs[key] = [];
+    s[key].t.split('\n').forEach((raw, i) => {
+      const l = raw.trim(); if (!l || (l[0] === '#' && key !== 'todo')) return;
+      const r = fns[key](l); if (r) { r.i = i; out[key].push(r); } else out.errs[key].push([i + 1, l]);
+    });
+  }
   memo = {k, v: out}; return out;
 }
 function eventsOn(d) {
@@ -277,8 +314,8 @@ function eventsOn(d) {
 const agenda = d => { const ev = eventsOn(d); return ev.length ? ev.map(e => `<div class="row ev ${e.k}"><span class="time">${e.s == null ? 'all day' : ft(e.s) + (e.e != null ? '\u2013' + ft(e.e) : '')}</span><span class="t">${esc(e.t)}</span></div>`).join('') : '<div class="empty">Nothing scheduled.</div>'; };
 
 /* ---------- habits ---------- */
-const hToday = () => { const t = todayStr(), h = live(state.habits); return {tot: h.length, done: h.filter(x => x.days && x.days[t]).length}; };
-function streak(h) { const d = new Date(), D = h.days || {}; let n = 0; if (!D[ymd(d)]) d.setDate(d.getDate() - 1); while (D[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
+const hToday = () => { const t = todayStr(), h = getSched().habit; return {tot: h.length, done: h.filter(x => x.days[t]).length}; };
+function streak(h) { const d = new Date(); let n = 0; if (!h.days[ymd(d)]) d.setDate(d.getDate() - 1); while (h.days[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
 
 /* ---------- render ---------- */
 const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['todo', 'To-do'], ['habit', 'Habits']];
@@ -299,7 +336,7 @@ function render(force) {
 }
 
 function homeP() {
-  const t = new Date(), open = live(state.tasks).filter(x => !x.k).sort((a, b) => a.c - b.c), hd = hToday(), up = [];
+  const t = new Date(), S = getSched(), open = S.todo.filter(x => !x.k), hd = hToday(), up = [];
   for (let i = 1; i <= 7; i++) { const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() + i); eventsOn(d).filter(e => e.k !== 'rec').forEach(e => up.push([d, e])); }
   return `<div class="cards">
   <div class="panel"><h2>Today</h2>${agenda(t)}</div>
@@ -307,6 +344,25 @@ function homeP() {
   <div class="panel"><h2>Habits</h2><div class="hring"><div class="ring">${ring(hd.tot ? hd.done / hd.tot : 0, 96, 9)}<b>${hd.tot ? hd.done + '/' + hd.tot : '\u2013'}</b></div><span class="tag">done today</span></div></div>
   <div class="panel"><h2>Coming up</h2>${up.slice(0, 8).map(([d, e]) => `<div class="row"><span class="time">${fmtD(d)}</span><span class="t">${esc(e.t)}</span></div>`).join('') || '<div class="empty">Nothing in the next 7 days.</div>'}</div></div>
   <p class="tag">Placeholder summary. Tell me what you want here.</p>`;
+}
+
+const PX = 44;
+function lanes(list) {
+  const out = []; let grp = [], gend = -1;
+  const flush = () => { const ends = []; grp.forEach(e => { let l = ends.findIndex(x => x <= e.s); if (l < 0) { l = ends.length; ends.push(0); } ends[l] = e.en; e.lane = l; }); grp.forEach(e => { e.n = ends.length; }); out.push(...grp); grp = []; };
+  list.forEach(e => { if (grp.length && e.s >= gend) { flush(); gend = -1; } grp.push(e); gend = Math.max(gend, e.en); });
+  flush(); return out;
+}
+function gridHtml(days) {
+  const evs = days.map(eventsOn), td = todayStr(); let lo = 7, hi = 20;
+  const en = e => e.e != null ? (e.e > e.s ? e.e : 1440) : e.s + 30;
+  evs.forEach(a => a.forEach(e => { if (e.s != null) { lo = Math.min(lo, Math.floor(e.s / 60)); hi = Math.max(hi, Math.min(24, Math.ceil(en(e) / 60))); } }));
+  const H = (hi - lo) * PX;
+  const head = days.map(d => `<button class="tgd${ymd(d) === td ? ' today' : ''}" data-a="goday" data-v="${ymd(d)}">${d.toLocaleDateString(undefined, {weekday: 'short'})} ${d.getDate()}</button>`).join('');
+  const ad = evs.map(a => `<div class="tgc">${a.filter(e => e.s == null).map(e => `<i class="chip ${e.k}">${esc(e.t)}</i>`).join('')}</div>`).join('');
+  const cols = evs.map(a => `<div class="tcol" style="height:${H}px">${lanes(a.filter(e => e.s != null).map(e => ({...e, en: en(e)}))).map(e => { const tr = ft(e.s) + (e.e != null ? '\u2013' + ft(e.e) : ''); return `<div class="blk ${e.k}" style="top:${(e.s - lo * 60) / 60 * PX}px;height:${Math.max(18, (e.en - e.s) / 60 * PX - 2)}px;left:${e.lane / e.n * 100}%;width:${100 / e.n}%" title="${esc(tr + ' ' + e.t)}"><b>${tr}</b> ${esc(e.t)}</div>`; }).join('')}</div>`).join('');
+  const hrs = [...Array(hi - lo)].map((_, i) => `<span style="top:${i * PX}px">${ft((lo + i) * 60)}</span>`).join('');
+  return `<div class="tgw"><div class="tg${days.length > 1 ? ' wide' : ''}" style="--n:${days.length}"><div class="tgr"><div></div>${head}</div><div class="tgr ad"><div class="tgl">all day</div>${ad}</div><div class="tgr"><div class="tgut" style="height:${H}px">${hrs}</div>${cols}</div></div></div>`;
 }
 
 function calHtml() {
@@ -323,14 +379,14 @@ function calHtml() {
   } else if (m === 'week') {
     const s = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
     title = fmtD(s) + ' \u2013 ' + fmtD(e);
-    body = [...Array(7)].map((_, i) => { const d = new Date(s.getFullYear(), s.getMonth(), s.getDate() + i); return `<div class="wkday${ymd(d) === t ? ' today' : ''}"><h4>${fmtL(d)}</h4>${agenda(d)}</div>`; }).join('');
-  } else { title = fmtL(c); body = agenda(c); }
+    body = gridHtml([...Array(7)].map((_, i) => new Date(s.getFullYear(), s.getMonth(), s.getDate() + i)));
+  } else { title = fmtL(c); body = gridHtml([c]); }
   return `<div class="tb"><h2 style="margin:0;flex:1">${title}</h2><span class="seg">${['month', 'week', 'day'].map(x => `<button class="${m === x ? 'on' : ''}" data-a="mode" data-v="${x}">${cap(x)}</button>`).join('')}</span><span><button class="ghost" data-a="nav" data-v="-1" aria-label="Previous">\u2039</button><button class="ghost" data-a="today">Today</button><button class="ghost" data-a="nav" data-v="1" aria-label="Next">\u203A</button></span></div>${body}`;
 }
 const errHtml = k => getSched().errs[k].map(([n, l]) => `<div>Line ${n} can't be read: ${esc(l)}</div>`).join('');
 function editor(k, title, hint, form) {
   const txt = state.sched[k].t;
-  return `<section class="panel"><h2>${title}</h2><p class="tag">${hint} Delete a line to remove the event.</p><details class="add"><summary class="btn">+ Add</summary>${form}</details><textarea data-k="${k}" rows="${Math.max(4, txt.split('\n').length + 1)}" spellcheck="false" aria-label="${title}">${esc(txt)}</textarea><div class="errs" id="err-${k}">${errHtml(k)}</div></section>`;
+  return `<section class="panel"><h2>${title}</h2><p class="tag">${hint} Delete a line to remove the event.</p>${form ? `<details class="add"><summary class="btn">+ Add</summary>${form}</details>` : ''}<textarea data-k="${k}" rows="${Math.max(4, txt.split('\n').length + 1)}" spellcheck="false" aria-label="${title}">${esc(txt)}</textarea><div class="errs" id="err-${k}">${errHtml(k)}</div></section>`;
 }
 const when = `<label class="tag">Start <input type="time" name="s"></label><label class="tag">End <input type="time" name="e"></label>`;
 function schedP() {
@@ -342,18 +398,21 @@ function schedP() {
   ${editor('bday', 'Birthdays', 'Format: Mar 5 1990 Name. The year is optional and shows an age.', `<form data-f="bday">${md}<input type="number" name="yr" min="1900" max="2100" placeholder="Year"><input type="text" name="t" placeholder="Name" required><button class="btn">Add</button></form>`)}`;
 }
 
-const trow = x => `<div class="row${x.k ? ' done' : ''}"><button class="chk" data-a="tog" data-v="${x.id}" aria-label="${x.k ? 'Uncheck' : 'Check'}"></button><span class="t">${esc(x.t)}</span><span class="due">Added ${fts(x.c)}${x.k ? ' \u00B7 Checked ' + fts(x.k) : ''}</span><button class="x" data-a="deltask" data-v="${x.id}" aria-label="Delete">\u2715</button></div>`;
-function todoP() {
-  const all = live(state.tasks), open = all.filter(x => !x.k).sort((a, b) => a.c - b.c), done = all.filter(x => x.k).sort((a, b) => b.k - a.k);
+const addLine = (k, line) => { const cur = state.sched[k].t; state.sched[k] = {t: (cur && !/\n$/.test(cur) ? cur + '\n' : cur) + line, u: now()}; };
+const lineOp = (k, i, fn) => { const ls = state.sched[k].t.split('\n'), r = fn(ls[i]); if (r == null) ls.splice(i, 1); else ls[i] = r; state.sched[k] = {t: ls.join('\n'), u: now()}; };
+const trow = x => `<div class="row${x.k ? ' done' : ''}"><button class="chk" data-a="tog" data-v="${x.i}" aria-label="${x.k ? 'Uncheck' : 'Check'}"></button><span class="t">${esc(x.t)}</span><span class="due">${x.c ? 'Added ' + fts(x.c) : ''}${x.kd ? ' \u00B7 Checked ' + fts(x.kd) : ''}</span><button class="x" data-a="deltask" data-v="${x.i}" aria-label="Delete">\u2715</button></div>`;
+function todoVis() {
+  const all = getSched().todo, open = all.filter(x => !x.k), done = all.filter(x => x.k);
   return `<div class="panel"><h2>To-do</h2>${open.map(trow).join('') || '<div class="empty">Nothing to do.</div>'}<form data-f="task"><input type="text" name="task" placeholder="Add a task" required><button class="btn">Add</button></form></div>
   <details class="panel done-box"${view.dopen ? ' open' : ''}><summary>Checked off (${done.length})</summary>${done.map(trow).join('') || '<div class="empty">Nothing checked yet.</div>'}</details>`;
 }
-
-function habitP() {
-  const h = live(state.habits), days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
-  return `<div class="panel"><h2>Habits</h2>${h.length ? `<div class="hhead">${days.map(d => `<span>${d.toLocaleDateString(undefined, {weekday: 'narrow'})}</span>`).join('')}</div>` : ''}${h.map(x => `<div class="row"><span class="t">${esc(x.name)} <span class="tag">\uD83D\uDD25${streak(x)}</span></span><span class="strip">${days.map(d => { const s = ymd(d); return `<button class="chk${(x.days || {})[s] ? ' on' : ''}" data-a="hab" data-v="${x.id}" data-d="${s}" aria-label="${s}"></button>`; }).join('')}</span><button class="x" data-a="delhab" data-v="${x.id}" aria-label="Delete">\u2715</button></div>`).join('') || '<div class="empty">No habits yet.</div>'}
+const todoP = () => `<div id="vis">${todoVis()}</div>${editor('todo', 'To-do list', 'One task per line: Oct 14 2026 Buy milk. A line starting with ### is checked off: ### Oct 14 2026 > Oct 15 2026 Buy milk.', '')}`;
+function habitVis() {
+  const h = getSched().habit, days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
+  return `<div class="panel"><h2>Habits</h2>${h.length ? `<div class="hhead">${days.map(d => `<span>${d.toLocaleDateString(undefined, {weekday: 'narrow'})}</span>`).join('')}</div>` : ''}${h.map(x => `<div class="row"><span class="t">${esc(x.name)} <span class="tag">\uD83D\uDD25${streak(x)}</span></span><span class="strip">${days.map(d => { const s = ymd(d); return `<button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button>`; }).join('')}</span><button class="x" data-a="delhab" data-v="${x.i}" aria-label="Delete">\u2715</button></div>`).join('') || '<div class="empty">No habits yet.</div>'}
   <form data-f="habit"><input type="text" name="habit" placeholder="New habit" required><button class="btn">Add</button></form><p class="tag">Placeholder tracker. Tell me what you want here.</p></div>`;
 }
+const habitP = () => `<div id="vis">${habitVis()}</div>${editor('habit', 'Habit list', 'One habit per line with the days you did it: Meditate | 2026-10-12, 2026-10-13.', '')}`;
 
 /* ---------- events ---------- */
 const reCal = () => { const w = document.getElementById('calwrap'); if (w) w.innerHTML = calHtml(); };
@@ -367,10 +426,11 @@ $app.addEventListener('click', e => {
   if (a === 'pick') { view.cur = new Date(v + 'T00:00'); return reCal(); }
   if (a === 'today') { view.cur = new Date(); return reCal(); }
   if (a === 'nav') { const k = +v; view.cur = view.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + k, 1) : new Date(c.getFullYear(), c.getMonth(), c.getDate() + k * (view.mode === 'week' ? 7 : 1)); return reCal(); }
-  if (a === 'tog') { const t = state.tasks.find(x => x.id === v); t.k = t.k ? 0 : u; t.u = u; }
-  if (a === 'deltask') { const t = state.tasks.find(x => x.id === v); t.del = true; t.u = u; }
-  if (a === 'hab') { const h = state.habits.find(x => x.id === v); h.days = h.days || {}; if (h.days[b.dataset.d]) delete h.days[b.dataset.d]; else h.days[b.dataset.d] = 1; h.u = u; }
-  if (a === 'delhab') { const h = state.habits.find(x => x.id === v); h.del = true; h.u = u; }
+  if (a === 'goday') { view.cur = new Date(v + 'T00:00'); view.mode = 'day'; return reCal(); }
+  if (a === 'tog') lineOp('todo', +v, l => { const x = pTodo(l.trim()); if (!x) return l; const c = x.c ? lineD(x.c) + ' ' : ''; return x.k ? c + x.t : '### ' + c + '> ' + lineD(u) + ' ' + x.t; });
+  if (a === 'deltask') lineOp('todo', +v, () => null);
+  if (a === 'hab') lineOp('habit', +v, l => { const x = pHabit(l.trim()); if (!x) return l; const s = b.dataset.d; if (x.days[s]) delete x.days[s]; else x.days[s] = 1; return x.name + ' | ' + Object.keys(x.days).sort().join(', '); });
+  if (a === 'delhab') lineOp('habit', +v, () => null);
   changed();
 });
 function mkLine(k, d) {
@@ -391,14 +451,14 @@ function mkLine(k, d) {
 }
 $app.addEventListener('submit', e => {
   e.preventDefault(); const f = e.target, k = f.dataset.f, d = new FormData(f), u = now();
-  if (k === 'task') { state.tasks.push({id: uid(), t: d.get('task').trim(), c: u, k: 0, u}); view.rf = 'task'; }
-  else if (k === 'habit') state.habits.push({id: uid(), name: d.get('habit').trim(), days: {}, u});
+  if (k === 'task') { addLine('todo', lineD(u) + ' ' + d.get('task').trim()); view.rf = 'task'; }
+  else if (k === 'habit') addLine('habit', d.get('habit').trim().replace(/\|/g, '') + ' |');
   else { const line = mkLine(k, d); if (!line) return; const cur = state.sched[k].t; state.sched[k] = {t: (cur && !/\n$/.test(cur) ? cur + '\n' : cur) + line, u}; }
   changed();
 });
 $app.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.k; if (!k) return;
-  state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal();
+  state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal(); const vs = document.getElementById('vis'); if (vs) vs.innerHTML = view.tab === 'todo' ? todoVis() : habitVis();
   const x = document.getElementById('err-' + k); if (x) x.innerHTML = errHtml(k);
 });
 $app.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('done-box')) view.dopen = e.target.open; }, true);
@@ -408,6 +468,7 @@ function backup() {
   a.download = 'dashboard-backup-' + todayStr() + '.json'; a.click(); toast('Backup downloaded');
 }
 window.addEventListener('online', () => signedIn && pull());
+state = norm(load() || {});
 render();
 window.addEventListener('load', initAuth);
 </script>
