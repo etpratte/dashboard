@@ -7,9 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef1f4;--panel:#fff;--ink:#1b2430;--mute:#66727f;--line:#d9dfe5;--acc:#2563eb;--accsoft:#dbe6fb;--warn:#b4432f;
+:root{--bg:#12171d;--panel:#1a212a;--ink:#e6ebf0;--mute:#8d9aa8;--line:#2b3541;--acc:#7aa9ff;--accsoft:#1e2b47;--warn:#e58a76;--ok:#4ade80;--oksoft:#12301f;color-scheme:dark;
 --serif:'Space Grotesk','Segoe UI',system-ui,sans-serif;--sans:'DM Sans',system-ui,-apple-system,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#12171d;--panel:#1a212a;--ink:#e6ebf0;--mute:#8d9aa8;--line:#2b3541;--acc:#7aa9ff;--accsoft:#1e2b47;--warn:#e58a76}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--sans);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -113,6 +112,21 @@ select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(-
 .adds{display:flex;flex-direction:column;gap:6px}
 .warn{border-color:var(--warn);color:var(--warn);margin-bottom:16px}
 .link{color:var(--acc);text-decoration:underline}
+.dtop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}.dtop .tb{margin:0}
+.qbox{max-width:300px;padding:8px 12px;margin:0}.qq{font:500 13px/1.35 var(--serif)}.qa{font-size:11px;color:var(--mute);margin-top:4px}
+.hww{overflow-x:auto}table.hw{border-collapse:collapse;width:100%;min-width:780px;table-layout:fixed}
+.hw th,.hw td{border:1px solid var(--line);vertical-align:top;padding:4px}
+.hw th{font-weight:500;color:var(--mute);font-size:13px;padding:6px}.hw th.today{color:var(--acc)}
+.hw th:first-child,.hw td.hcn{width:120px}
+.hcin{width:100%;background:transparent;border:0;font-weight:600;color:var(--ink);padding:4px;border-radius:6px}.hcin:focus{background:var(--bg)}
+.hc{min-height:44px;cursor:text}.hph{color:var(--line);font-size:12px}
+.hl{display:flex;align-items:flex-start;gap:6px;padding:2px 4px;margin-bottom:2px;border-radius:6px;font-size:13px;overflow-wrap:anywhere}
+.hl .chk{width:16px;height:16px;border-width:1.5px;margin-top:2px}
+.hl.hd{background:var(--oksoft);color:var(--ok)}
+.hl .chk.on,.row.hwd .chk.on{background:var(--ok);border-color:var(--ok)}.hl .chk.on::after{width:4px;height:8px}
+.row.hwd .t{color:var(--ok)}
+.hwt{width:100%;margin:0;font:13px/1.4 var(--sans);min-height:60px}
+.grip{touch-action:none;cursor:grab;color:var(--mute);padding:0 6px;user-select:none}.dragging{opacity:.5}.dropt{box-shadow:0 2px 0 var(--acc)}
 </style>
 </head>
 <body>
@@ -133,7 +147,7 @@ const todayStr = () => ymd(new Date());
 const now = () => Date.now();
 
 let state = {};
-let view = {tab: ['home', 'sched', 'tasks', 'habit', 'data'].includes(localStorage.getItem('dash-tab')) ? localStorage.getItem('dash-tab') : 'home', mode: 'week', cur: new Date(), range: +localStorage.getItem('dash-range') || 14};
+let view = {tab: ['home', 'sched', 'tasks', 'hw', 'habit', 'data'].includes(localStorage.getItem('dash-tab')) ? localStorage.getItem('dash-tab') : 'home', mode: 'week', cur: new Date(), hw: new Date(), range: +localStorage.getItem('dash-range') || 14};
 let token = null, exp = 0, tc = null, fileId = null, status = 'offline', signedIn = false;
 const known = () => !!localStorage.getItem('dash-in');
 let saveTimer = null, busy = false;
@@ -230,7 +244,7 @@ const fmtD = (d, y) => d.toLocaleDateString(undefined, y ? {month: 'short', day:
 const fmtL = d => d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'});
 const fts = ts => { const d = new Date(ts); return fmtD(d, d.getFullYear() !== new Date().getFullYear()); };
 const ft = n => { const h = Math.floor(n / 60), m = n % 60; return ((h + 11) % 12 + 1) + (m ? ':' + pad(m) : '') + (h < 12 ? 'am' : 'pm'); };
-const LISTS = ['once', 'rec', 'bday', 'task', 'rtask', 'gen', 'habit', 'quote'];
+const LISTS = ['once', 'rec', 'bday', 'task', 'rtask', 'gen', 'habit', 'quote', 'hw'];
 const lineD = ts => { const d = new Date(ts); return MON[d.getMonth()] + ' ' + d.getDate() + ' ' + d.getFullYear(); };
 const oldToNew = l => { const x = pOldTodo(l.trim()); if (!x) return l; return (x.k ? '### ' : '') + x.t + (x.c ? ' [added ' + lineD(x.c) + ']' : '') + (x.kd ? ' [done ' + lineD(x.kd) + ']' : ''); };
 function norm(s) {
@@ -293,12 +307,16 @@ function dayCodes(w) {
   }
   return out.length ? out : null;
 }
-function pRec(l, needTime = true) {
-  let r = l, days = new Set(), mm, n = 0;
-  while ((mm = /^([^\s,/&]+)[\s,/&]*/.exec(r))) { const c = dayCodes(mm[1].toLowerCase()); if (!c) break; c.forEach(i => days.add(i)); r = r.slice(mm[0].length); n++; }
+function pRec(l, needTime = true, allowDom = false) {
+  let r = l, days = new Set(), dom = new Set(), mm, n = 0;
+  while ((mm = /^([^\s,/&]+)[\s,/&]*/.exec(r))) {
+    const w = mm[1].toLowerCase(), c = dayCodes(w), o = allowDom && (w === 'last' ? [-1] : (/^(\d{1,2})(?:st|nd|rd|th)$/.exec(w) || []).slice(1).map(Number).filter(v => v >= 1 && v <= 31));
+    if (c) c.forEach(i => days.add(i)); else if (o && o.length) o.forEach(i => dom.add(i)); else break;
+    r = r.slice(mm[0].length); n++;
+  }
   if (!n) return null;
   const t = trange(r); if (!t || !t.rest.trim() || (needTime && !t.timed)) return null;
-  return {days, s: t.s, e: t.e, t: t.rest.trim()};
+  return {days, dom, s: t.s, e: t.e, t: t.rest.trim()};
 }
 function pBday(l) {
   const m = /^([a-z]{3})[a-z]*\.?\s+(\d{1,2})(?:\s+(\d{4}))?\s+(.+)$/i.exec(l); if (!m) return null;
@@ -320,7 +338,11 @@ function tags(l) {
   let r = l.trim(), color = null, added = null, done = null, year = 0, bad = false, m;
   while ((m = /\s*\[([^\]]*)\]$/.exec(r))) {
     const x = m[1].trim().toLowerCase(), d = /^(added|done)\s+(.+)$/.exec(x), pd = d && pDate(d[2]);
-    if (d && pd) { if (d[1] === 'added') added = pd.ts; else done = pd.ts; }
+    if (d && pd) {
+      let ts = pd.ts; const rest = d[2].slice(pd.n).trim();
+      if (rest) { const t = /^(\d{1,2})(?::(\d{2}))?\s*([ap]m)$/.exec(rest), mm = t && hm(t[1], t[2], t[3]); if (mm == null) { bad = true; break; } ts += mm * 60000; }
+      if (d[1] === 'added') added = ts; else done = ts;
+    }
     else if (/^\d{4}$/.test(x)) year = +x;
     else if (Object.prototype.hasOwnProperty.call(COLORS, x)) color = x;
     else { bad = true; break; }
@@ -335,12 +357,18 @@ function pTask(l) {
   if (mo < 0 || !dateOk(y, mo, d) || !m[4].trim()) return null;
   return {k, due: new Date(y, mo, d).getTime(), added: g.added, done: g.done, t: m[4].trim(), hasYear: !!(m[3] || g.year)};
 }
-function fixYears(text) {
-  const yr = new Date().getFullYear();
+const doneStamp = u => { const d = new Date(u); return lineD(u) + ' ' + ft(d.getHours() * 60 + d.getMinutes()); };
+function fixLines(key, text) {
+  const yr = new Date().getFullYear(), st = lineD(now()), ds = doneStamp(now());
   return text.split('\n').map(raw => {
-    const l = raw.trim(), x = l && pTask(l); if (!x || x.hasYear) return raw;
+    const l = raw.trim(), x = l && (key === 'task' ? pTask(l) : pGen(l)); if (!x) return raw;
     const pre = /^###/.test(l) ? '### ' : '', body = l.replace(/^###\s*/, ''), g = tags(body);
-    return pre + g.rest + ' [' + yr + ']' + body.slice(g.rest.length);
+    let out = pre + g.rest;
+    if (key === 'task' && !x.hasYear) out += ' [' + yr + ']';
+    out += body.slice(g.rest.length);
+    if (!g.added) out += ' [added ' + st + ']';
+    if (x.k && !g.done) out += ' [done ' + ds + ']';
+    return out;
   }).join('\n');
 }
 function pGen(l) {
@@ -352,13 +380,44 @@ function pHabit(l) {
   if (i >= 0) l.slice(i + 1).split(/[\s,]+/).filter(Boolean).forEach(x => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(x); if (m && dateOk(+m[1], +m[2] - 1, +m[3])) days[x] = 1; else ok = false; });
   return name && ok ? {name, days} : null;
 }
-function pQuote(l) { const m = /^(.*\S)\s+[-\u2013\u2014]\s+(\S.*)$/.exec(l), q = (m ? m[1] : l).replace(/^["\u201C]+|["\u201D]+$/g, '').trim(); return q ? {q, a: m ? m[2].trim() : ''} : null; }
+function pQuote(l) { const m = /^(.*\S)\s+[-\u2013\u2014]\s+(\S.*)$/.exec(l), q = (m ? m[1] : l).trim(); return q ? {q, a: m ? m[2].trim() : ''} : null; }
 function quoteOfDay() { const Q = getSched().quote; if (!Q.length) return null; const n = new Date(); return Q[Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 864e5) % Q.length]; }
+const HWD = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+function pHw(l) {
+  const m = /^(\d{4}):(\d{1,2}):(.*)$/.exec(l); if (!m) return null;
+  let d; try { d = JSON.parse(m[3]); } catch (e) { return null; }
+  if (!Array.isArray(d)) return null;
+  const cls = [];
+  for (const c of d) {
+    if (!Array.isArray(c) || typeof c[0] !== 'string' || !c[0].trim() || (c[1] != null && (typeof c[1] !== 'object' || Array.isArray(c[1])))) return null;
+    const days = {};
+    for (const k of Object.keys(c[1] || {})) { if (!HWD.includes(k) || !Array.isArray(c[1][k]) || c[1][k].some(x => typeof x !== 'string')) return null; days[k] = c[1][k]; }
+    cls.push([c[0], days]);
+  }
+  return {y: +m[1], w: +m[2], cls};
+}
+function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); const y = t.getUTCFullYear(); return {y, w: Math.ceil(((t - Date.UTC(y, 0, 1)) / 864e5 + 1) / 7)}; }
+const monOf = d => new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+function hwGet(y, w) {
+  const S = getSched().hw, key = y * 100 + w, K = e => e.y * 100 + e.w, cur = S.filter(e => K(e) === key).pop();
+  if (cur) return JSON.parse(JSON.stringify(cur.cls));
+  const prev = S.filter(e => K(e) < key).sort((a, b) => K(a) - K(b)).pop() || S.filter(e => K(e) > key).sort((a, b) => K(a) - K(b))[0];
+  return prev ? prev.cls.map(([n]) => [n, {}]) : [];
+}
+function hwWrite(y, w, cls) {
+  const key = y * 100 + w, line = cls.length ? y + ':' + pad(w) + ':' + JSON.stringify(cls) : null, ls = state.sched.hw.t ? state.sched.hw.t.split('\n') : [];
+  const K = x => { const m = /^\s*(\d{4}):(\d{1,2}):/.exec(x); return m ? +m[1] * 100 + +m[2] : null; };
+  const i = ls.findIndex(x => K(x) === key);
+  if (i >= 0) { if (line) ls[i] = line; else ls.splice(i, 1); }
+  else if (line) { const j = ls.findIndex(x => K(x) != null && K(x) > key); if (j < 0) ls.push(line); else ls.splice(j, 0, line); }
+  state.sched.hw = {t: ls.join('\n'), u: now()};
+}
+const hwEdit = (y, w, fn) => { const cls = hwGet(y, w); fn(cls); hwWrite(y, w, cls); changed(); };
 const ev = f => l => { const g = tags(l); if (g.bad || g.year) return null; const r = f(g.rest); if (r) r.color = g.color; return r; };
 let memo = {k: '', v: null};
 function getSched() {
   const s = state.sched, k = LISTS.map(x => s[x].t).join('\u0001'); if (memo.k === k) return memo.v;
-  const out = {errs: {}}, fns = {once: ev(pOnce), rec: ev(pRec), bday: ev(pBday), task: pTask, rtask: l => /\[[^\]]*\]\s*$/.test(l) ? null : pRec(l, false), gen: pGen, habit: pHabit, quote: pQuote};
+  const out = {errs: {}}, fns = {once: ev(pOnce), rec: ev(pRec), bday: ev(pBday), task: pTask, rtask: l => /\[[^\]]*\]\s*$/.test(l) ? null : pRec(l, false, true), gen: pGen, habit: pHabit, quote: pQuote, hw: pHw};
   for (const key of LISTS) {
     out[key] = []; out.errs[key] = [];
     s[key].t.split('\n').forEach((raw, i) => {
@@ -380,42 +439,60 @@ function eventsOn(d, rec = true) {
   S.bday.forEach(o => { if (o.m === mo && o.d === da) out.push({s: null, e: null, color: o.color, t: '\uD83C\uDF82 ' + nice(o.t) + (o.y ? ' (' + (y - o.y) + ')' : ''), k: 'bday'}); });
   return out.sort((a, b) => (a.s == null ? -1 : a.s) - (b.s == null ? -1 : b.s));
 }
-const agenda = (d, rec) => { const ev = eventsOn(d, rec !== false); return ev.length ? ev.map(e => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span>${e.s == null ? '' : `<span class="time">${fmtRange(e.s, e.e)}</span>`}<span class="t">${esc(e.t)}</span></div>`).join('') : '<div class="empty">Nothing scheduled.</div>'; };
+const agenda = (d, rec) => { const ev = eventsOn(d, rec !== false); return ev.length ? ev.map(e => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span>${e.s == null ? '' : `<span class="time">${fmtRange(e.s, e.e)}</span>`}<span class="t">${esc(e.t)}</span></div>`).join('') : '<div class="empty">Nothing Scheduled.</div>'; };
 
 /* ---------- habits ---------- */
 const hToday = () => { const t = todayStr(), h = getSched().habit; return {tot: h.length, done: h.filter(x => x.days[t]).length}; };
 function streak(h) { const d = new Date(); let n = 0; if (!h.days[ymd(d)]) d.setDate(d.getDate() - 1); while (h.days[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
 
 /* ---------- render ---------- */
-const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['tasks', 'Tasks'], ['habit', 'Habits'], ['data', 'Data']];
-const statusText = () => ({synced: 'Synced', syncing: 'Syncing\u2026', saving: 'Saving\u2026', error: 'Sync failed, will retry', offline: 'Not synced'}[status]);
+const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['tasks', 'Tasks'], ['hw', 'HW'], ['habit', 'Habits'], ['data', 'Data']];
+const statusText = () => ({synced: 'Synced', syncing: 'Syncing\u2026', saving: 'Saving\u2026', error: 'Sync Failed, Will Retry', offline: 'Not Synced'}[status]);
 function render(force) {
   if (!signedIn && !known()) {
-    $app.innerHTML = `<div class="gate"><h1>Big Guy Life Dashboard</h1><p class="empty">Sign in with Google to load your data from your own Drive. Nothing is stored anywhere else.</p><button class="btn" data-a="signin">Sign in with Google</button></div>`;
+    $app.innerHTML = `<div class="gate"><h1>Big Guy Life Dashboard</h1><p class="empty">Sign In With Google to load your data from your own Drive. Nothing is stored anywhere else.</p><button class="btn" data-a="signin">Sign In With Google</button></div>`;
     return;
   }
   if (!force && $app.querySelector('input:focus,textarea:focus')) { const s = document.getElementById('sync'); if (s) s.textContent = statusText(); return; }
   const d = new Date();
   $app.innerHTML = `<header><div class="hd"><h1>Big Guy Life Dashboard</h1><p>${d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'})}</p></div>
-  <div class="sync"><span id="sync">${statusText()}</span> ${signedIn ? '' : '<button class="btn" data-a="signin">Sign in to sync</button>'}</div></header>
+  <div class="sync"><span id="sync">${statusText()}</span> ${signedIn ? '' : '<button class="btn" data-a="signin">Sign In To Sync</button>'}</div></header>
   <nav class="tabs">${TABS.map(([k, n]) => `<button class="tab${view.tab === k ? ' on' : ''}" data-a="tab" data-v="${k}">${n}</button>`).join('')}</nav>
-  ${view.tab === 'data' ? '' : errBanner()}${({home: homeP, sched: schedP, tasks: tasksP, habit: habitP, data: dataP})[view.tab]()}`;
+  ${view.tab === 'data' ? '' : errBanner(view.tab)}${({home: homeP, sched: schedP, tasks: tasksP, hw: hwP, habit: habitP, data: dataP})[view.tab]()}`;
   if (view.rf) { const el = $app.querySelector(`[name="${view.rf}"]`); view.rf = null; if (el) el.focus(); }
 }
 
+const recent = x => x.k && x.done && now() - x.done < 864e5;
+const wd = d => d.toLocaleDateString(undefined, {weekday: 'short'}) + ' ' + fmtD(d);
+function hwItems(t) {
+  const {y, w} = isoWeek(t), dk = HWD[(t.getDay() + 6) % 7], out = [];
+  hwGet(y, w).forEach(([n, dd], ci) => (dd[dk] || []).forEach((l, i) => out.push({n, l, ci, i, dk, wk: y + ':' + w})));
+  return out;
+}
+const hwRow = x => { const dn = /^###/.test(x.l); return `<div class="row${dn ? ' hwd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-wk="${x.wk}" data-c="${x.ci}" data-d="${x.dk}" data-i="${x.i}" aria-label="Toggle Done"></button><span class="t">${esc(nice(x.n))}: ${esc(nice(x.l.replace(/^###\s*/, '')))}</span></div>`; };
+const rtOn = (x, d) => x.days.has(d.getDay()) || x.dom.has(d.getDate()) || (x.dom.has(-1) && new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() === d.getDate());
 function homeP() {
   const t = new Date(), S = getSched(), R = view.range, day = i => new Date(t.getFullYear(), t.getMonth(), t.getDate() + i), td = day(0).getTime(), end = day(R).getTime();
   const up = []; for (let i = 1; i <= R; i++) eventsOn(day(i), false).forEach(e => up.push([day(i), e]));
-  const due = S.task.filter(x => !x.k && x.due <= td).sort((a, b) => a.due - b.due), rt = S.rtask.filter(x => x.days.has(t.getDay())), gen = S.gen.filter(x => !x.k), upT = S.task.filter(x => !x.k && x.due > td && x.due <= end).sort((a, b) => a.due - b.due);
-  const none = m => `<div class="empty">${m}</div>`;
-  const q = quoteOfDay();
-  return `<div class="tb"><span class="tag">Look ahead</span><select data-r="1" aria-label="Look ahead days">${[7, 14, 30, 60].map(n => `<option value="${n}"${n === R ? ' selected' : ''}>${n} days</option>`).join('')}</select></div>
+  const due = S.task.filter(x => (!x.k && x.due <= td) || recent(x)).sort((a, b) => a.due - b.due), rt = S.rtask.filter(x => rtOn(x, t)), gen = S.gen.filter(x => !x.k || recent(x)), upT = S.task.filter(x => !x.k && x.due > td && x.due <= end).sort((a, b) => a.due - b.due);
+  const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay(), hw = hwItems(t);
+  return `<div class="dtop"><div class="tb"><span class="tag">Look Ahead</span><select data-r="1" aria-label="Look Ahead Days">${[7, 14, 30, 60].map(n => `<option value="${n}"${n === R ? ' selected' : ''}>${n} Days</option>`).join('')}</select></div>
+  <div class="panel qbox">${q ? `<div class="qq">${esc(q.q)}</div>${q.a ? `<div class="qa">\u2014 ${esc(q.a)}</div>` : ''}` : '<div class="qa">Add quotes on the Data page.</div>'}</div></div>
   <div class="cards">
-  <div class="panel span2">${q ? `<div class="qq">\u201C${esc(q.q)}\u201D</div>${q.a ? `<div class="qa">\u2014 ${esc(q.a)}</div>` : ''}` : '<div class="empty">Add quotes on the Data page and one shows here each day.</div>'}</div>
   <div class="panel"><h2>Today</h2>${agenda(t)}</div>
-  <div class="panel"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${fmtD(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing approaching.')}</div>
-  <div class="panel span2"><h2>Tasks today</h2><div class="split"><div>${due.map(x => taskRow(x, 'task')).join('')}${rt.map(rtRow).join('')}${due.length + rt.length ? '' : none('Nothing due today.')}</div><div><h3>General</h3>${gen.map(x => taskRow(x, 'gen')).join('') || none('No general tasks.')}</div></div></div>
-  <div class="panel"><h2>Approaching Tasks</h2>${upT.map(x => taskRow(x, 'task')).join('') || none('Nothing due soon.')}</div></div>`;
+  <div class="panel"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div>
+  <div class="panel span2"><h2>Tasks Today</h2><div class="split"><div>${due.map(x => taskRow(x, 'task')).join('')}${rt.map(rtRow).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div><div><h3>General</h3>${gen.map(x => taskRow(x, 'gen')).join('') || none('No General Tasks.')}</div></div></div>
+  <div class="panel"><h2>Approaching Tasks</h2>${upT.map(x => taskRow(x, 'task')).join('') || none('Nothing Due Soon.')}</div>
+  <div class="panel"><h2>HW Due Today</h2>${hw.map(hwRow).join('') || none('No HW Due Today.')}</div></div>`;
+}
+
+const hwLines = (items, ci, dk) => items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(nice(l.replace(/^###\s*/, '')))}</span></div>`; }).join('') || '<span class="hph">+</span>';
+function hwP() {
+  const c = view.hw, st = monOf(c), {y, w} = isoWeek(c), en = new Date(st.getFullYear(), st.getMonth(), st.getDate() + 6), cls = hwGet(y, w), td = todayStr();
+  const days = HWD.map((k, i) => ({k, d: new Date(st.getFullYear(), st.getMonth(), st.getDate() + i)}));
+  return `<div class="panel"><div class="tb"><div style="flex:1"><h2 style="margin:0">${y}: Week ${w}</h2><div class="tag">${fmtD(st)} \u2013 ${fmtD(en)}</div></div><span><button class="ghost" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost" data-a="hwnow">Now</button><button class="ghost" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
+  <div class="hww"><table class="hw"><thead><tr><th>Class</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n, dd], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(nice(n))}" aria-label="Class Name"></td>${days.map(x => `<td><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}">${hwLines(dd[x.k] || [], ci, x.k)}</div></td>`).join('')}</tr>`).join('')}<tr><td class="hcn"><input class="hcin" data-hc="new" placeholder="+ Add Class" aria-label="Add Class"></td><td colspan="7"></td></tr></tbody></table></div>
+  <p class="tag">Click a cell to type assignments, one per line. Click a circle to mark one done. Edit a class name in the first column; clear it to remove the class.</p></div>`;
 }
 
 const PX = 44;
@@ -460,63 +537,65 @@ function editor(k, title, hint, form) {
   return `<section class="panel"><h2>${title}</h2><p class="tag">${hint} Delete a line to remove the event.</p>${form ? `<details class="add"><summary class="btn">+ Add</summary>${form}</details>` : ''}<textarea data-k="${k}" rows="${Math.max(4, txt.split('\n').length + 1)}" spellcheck="false" aria-label="${title}">${esc(txt)}</textarea><div class="errs" id="err-${k}">${errHtml(k)}</div></section>`;
 }
 const when = `<label class="tag">Start <input type="time" name="s" required></label><label class="tag">End <input type="time" name="e"></label>`;
+const ed = (k, form) => { const m = LIST_META.find(x => x[0] === k); return editor(k, m[1], m[2], form || ''); };
 function schedP() {
   const md = `<input type="text" class="sm" name="mo" placeholder="Mar" maxlength="3" autocapitalize="off" required><input type="number" name="da" min="1" max="31" placeholder="Day" required>`;
-  const rec = `<form data-f="rec"><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div>${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form>`;
-  return `<div class="panel" id="calwrap">${calHtml()}</div>
-  <div class="panel"><h2>Add</h2><div class="adds">
-  <details class="add"><summary class="btn">+ Unique event</summary><form data-f="once">${md}${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form></details>
-  <details class="add"><summary class="btn">+ Recurring event</summary>${rec}</details>
-  <details class="add"><summary class="btn">+ Birthday</summary><form data-f="bday">${md}<input type="number" name="yr" min="1900" max="2100" placeholder="Year"><input type="text" name="t" placeholder="Name" required><button class="btn">Add</button></form></details></div></div>`;
+  const onceF = `<form data-f="once">${md}${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form>`;
+  const recF = `<form data-f="rec"><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div>${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form>`;
+  const bdayF = `<form data-f="bday">${md}<input type="number" name="yr" min="1900" max="2100" placeholder="Year"><input type="text" name="t" placeholder="Name" required><button class="btn">Add</button></form>`;
+  return `<div class="panel" id="calwrap">${calHtml()}</div>${ed('once', onceF)}${ed('rec', recF)}${ed('bday', bdayF)}`;
 }
 
 const addLine = (k, line) => { const cur = state.sched[k].t; state.sched[k] = {t: (cur && !/\n$/.test(cur) ? cur + '\n' : cur) + line, u: now()}; };
 const lineOp = (k, i, fn) => { const ls = state.sched[k].t.split('\n'), r = fn(ls[i]); if (r == null) ls.splice(i, 1); else ls[i] = r; state.sched[k] = {t: ls.join('\n'), u: now()}; };
 const todayStart = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime(); };
 function taskRow(x, l) {
-  const late = !x.k && x.due != null && x.due < todayStart();
-  const meta = (x.k ? [x.due != null ? 'Due ' + fts(x.due) : '', x.added ? 'Added ' + fts(x.added) : '', x.done ? 'Checked ' + fts(x.done) : ''] : [x.due != null ? 'Due ' + fts(x.due) : '']).filter(Boolean).join(' \u00B7 ');
-  return `<div class="row${x.k ? ' done' : ''}"><button class="chk" data-a="tog" data-l="${l}" data-v="${x.i}" aria-label="${x.k ? 'Uncheck' : 'Check'}"></button><span class="t">${esc(nice(x.t))}</span><span class="due${late ? ' late' : ''}">${meta}</span></div>`;
+  const late = !x.k && x.due != null && x.due < todayStart(), drag = l === 'gen' && !x.k;
+  const meta = x.k ? ['Completed' + (x.done ? ' ' + fts(x.done) : ''), x.due != null ? 'Due ' + fts(x.due) : ''].filter(Boolean).join(' \u00B7 ') : (x.due != null ? 'Due ' + fts(x.due) : '');
+  return `<div class="row${x.k ? ' done' : ''}"${drag ? ` data-gi="${x.i}"` : ''}>${drag ? '<span class="grip" data-grip="1" aria-label="Drag To Reorder">\u2261</span>' : ''}<button class="chk" data-a="tog" data-l="${l}" data-v="${x.i}" aria-label="${x.k ? 'Uncheck' : 'Check'}"></button><span class="t">${esc(nice(x.t))}</span><span class="due${late ? ' late' : ''}">${meta}</span></div>`;
 }
-const rtLabel = x => (x.days.size === 7 ? 'Daily' : [1, 2, 3, 4, 5, 6, 0].filter(i => x.days.has(i)).map(i => cap(DAYN[i])).join(' ')) + (x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : '');
+const ordS = n => n === -1 ? 'Last' : n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);
+const rtLabel = x => [x.days.size === 7 ? 'Daily' : [1, 2, 3, 4, 5, 6, 0].filter(i => x.days.has(i)).map(i => cap(DAYN[i])).join(' '), [...x.dom].sort((a, b) => a - b).map(ordS).join(' ')].filter(Boolean).join(' \u00B7 ') + (x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : '');
 const rtRow = x => `<div class="row"><span class="time">${rtLabel(x)}</span><span class="t">${esc(nice(x.t))}</span></div>`;
 function tasksVis() {
-  const S = getSched(), open = S.task.filter(x => !x.k).sort((a, b) => a.due - b.due), gen = S.gen.filter(x => !x.k);
+  const S = getSched(), open = S.task.filter(x => !x.k || recent(x)).sort((a, b) => a.due - b.due), gen = S.gen.filter(x => !x.k || recent(x));
   const done = [...S.task.map(x => [x, 'task']), ...S.gen.map(x => [x, 'gen'])].filter(([x]) => x.k).sort((a, b) => (b[0].done || 0) - (a[0].done || 0));
   const md = `<input type="text" class="sm" name="mo" placeholder="Mar" maxlength="3" autocapitalize="off" required><input type="number" name="da" min="1" max="31" placeholder="Day" required>`;
-  return `<div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No dated tasks.</div>'}<form data-f="task">${md}<input type="text" name="t" placeholder="Task (due date required)" required><button class="btn">Add</button></form></div>
-  <div class="panel"><h2>Recurring tasks</h2>${S.rtask.map(rtRow).join('') || '<div class="empty">No recurring tasks.</div>'}<form data-f="rtask"><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" name="t" placeholder="Recurring task" required><button class="btn">Add</button></form><p class="tag">Recurring tasks can't be checked off yet.</p></div>
-  <div class="panel"><h2>General tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No general tasks.</div>'}<form data-f="gen"><input type="text" name="t" placeholder="General task" required><button class="btn">Add</button></form></div>
-  <details class="panel done-box"${view.dopen ? ' open' : ''}><summary>Checked off (${done.length})</summary>${done.map(([x, l]) => taskRow(x, l)).join('') || '<div class="empty">Nothing checked yet.</div>'}</details>`;
+  return `<div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No Dated Tasks.</div>'}<form data-f="task"><input type="text" name="t" placeholder="Task (Due Date Required)" required>${md}<button class="btn">Add</button></form></div>
+  <div class="panel"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<form data-f="gen"><input type="text" name="t" placeholder="General Task" required><button class="btn">Add</button></form></div>
+  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(rtRow).join('') || '<div class="empty">No Recurring Tasks.</div>'}<form data-f="rtask"><input type="text" name="t" placeholder="Recurring Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" name="dm" placeholder="Day Of Month (1, 15, Last)"><button class="btn">Add</button></form><p class="tag">Recurring tasks can't be checked off yet.</p></div>
+  <div class="panel"><h2>Checked Off (${done.length})</h2>${done.map(([x, l]) => taskRow(x, l)).join('') || '<div class="empty">Nothing Checked Yet.</div>'}</div>`;
 }
-const tasksP = () => `<div id="vis">${tasksVis()}</div>`;
+const tasksP = () => `<div id="vis">${tasksVis()}</div>${ed('task')}${ed('gen')}${ed('rtask')}`;
 function habitVis() {
   const h = getSched().habit, days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
-  return `<div class="panel"><h2>Habits</h2>${h.length ? `<div class="hhead">${days.map(d => `<span>${d.toLocaleDateString(undefined, {weekday: 'narrow'})}</span>`).join('')}</div>` : ''}${h.map(x => `<div class="row"><span class="t">${esc(nice(x.name))} <span class="tag">\uD83D\uDD25${streak(x)}</span></span><span class="strip">${days.map(d => { const s = ymd(d); return `<button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button>`; }).join('')}</span><button class="x" data-a="delhab" data-v="${x.i}" aria-label="Delete">\u2715</button></div>`).join('') || '<div class="empty">No habits yet.</div>'}
-  <form data-f="habit"><input type="text" name="habit" placeholder="New habit" required><button class="btn">Add</button></form><p class="tag">Placeholder tracker. Tell me what you want here.</p></div>`;
+  return `<div class="panel"><h2>Habits</h2>${h.length ? `<div class="hhead">${days.map(d => `<span>${d.toLocaleDateString(undefined, {weekday: 'narrow'})}</span>`).join('')}</div>` : ''}${h.map(x => `<div class="row"><span class="t">${esc(nice(x.name))} <span class="tag">\uD83D\uDD25${streak(x)}</span></span><span class="strip">${days.map(d => { const s = ymd(d); return `<button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button>`; }).join('')}</span><button class="x" data-a="delhab" data-v="${x.i}" aria-label="Delete">\u2715</button></div>`).join('') || '<div class="empty">No Habits Yet.</div>'}
+  <form data-f="habit"><input type="text" name="habit" placeholder="New Habit" required><button class="btn">Add</button></form><p class="tag">Placeholder tracker. Tell me what you want here.</p></div>`;
 }
-const habitP = () => `<div id="vis">${habitVis()}</div>`;
+const habitP = () => `<div id="vis">${habitVis()}</div>${ed('habit')}`;
 
 /* ---------- data page: every list lives here ---------- */
 const LIST_META = [
-  ['once', 'Unique events', 'Format: mar 5 2026 5pm-6pm description [green]. A start time with am/pm is required; year and color are optional. Unique events are yellow unless you add a color.'],
-  ['rec', 'Recurring events', 'Format: mwf 5pm-6pm description. Days: mwf, tth, su, sa, mon,wed, daily, weekdays, weekends. Times need am/pm: 5pm-6pm, 5-5:30pm, 9am-3. Color tag optional, like [green].'],
+  ['once', 'Unique Events', 'Format: mar 5 2026 5pm-6pm description [green]. A start time with am/pm is required; year and color are optional. Unique events are yellow unless you add a color.'],
+  ['rec', 'Recurring Events', 'Format: mwf 5pm-6pm description. Days: mwf, tth, su, sa, mon,wed, daily, weekdays, weekends. Times need am/pm: 5pm-6pm, 5-5:30pm, 9am-3. Color tag optional, like [green].'],
   ['bday', 'Birthdays', 'Format: mar 5 1990 name. The year is optional and shows an age. Color tag optional, like [purple].'],
-  ['task', 'Tasks', 'One per line: oct 20 buy milk. A due date is required. When you finish editing, the year is added as a tag like [2026] (it comes back if you remove it). Start a line with ### to check it off; [added oct 14 2026] and [done oct 15 2026] tags record dates.'],
-  ['rtask', 'Recurring tasks', `One per line: mwf take vitamins. Days work like recurring events. They can't be checked off yet.`],
-  ['gen', 'General tasks', 'One per line, no date needed: buy milk. Start a line with ### to check it off.'],
+  ['task', 'Tasks', 'One per line: oct 20 buy milk. A due date is required. When you finish editing, [2026], [added ...] and (on checked lines) [done ...] tags are added for you and come back if removed. Start a line with ### to check it off.'],
+  ['gen', 'General Tasks', 'One per line, no date needed: buy milk. [added ...] and [done ...] tags are added for you. Start a line with ### to check it off. Drag the handle on the Tasks page or dashboard to reorder.'],
+  ['rtask', 'Recurring Tasks', `One per line: mwf take vitamins, or 1st,15th pay rent for days of the month (last works too). They can't be checked off yet.`],
+  ['hw', 'HW', 'One line per week: year:week:data, like 2026:42:[["math",{"mon":["ch 3 hw"],"wed":["### quiz"]}]]. Weeks run Monday to Sunday. The HW page edits these lines; ### marks an assignment done.'],
   ['habit', 'Habits', 'One habit per line with the days you did it: meditate | 2026-10-12, 2026-10-13.'],
-  ['quote', 'Quotes', 'One quote per line, with an optional author after a dash: The only way out is through - Robert Frost. The dashboard shows one each day.']
+  ['quote', 'Quotes', 'One quote per line, with an optional author after a dash: "The only way out is through" - Robert Frost. Type the quotation marks yourself if you want them. The dashboard shows one each day.']
 ];
-const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All data</h2><button class="btn" data-a="backup">Download backup</button></div><p class="tag">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}`;
-const errBanner = () => { const S = getSched(), n = LISTS.reduce((a, k) => a + S.errs[k].length, 0); return n ? `<div class="panel warn">${n} line${n > 1 ? 's' : ''} can't be read. Fix ${n > 1 ? 'them' : 'it'} on the <button class="link" data-a="tab" data-v="data">Data</button> page.</div>` : ''; };
+const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><button class="btn" data-a="backup">Download Backup</button></div><p class="tag">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}`;
+const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], tasks: ['task', 'rtask', 'gen'], habit: ['habit']};
+const errBanner = tab => { const S = getSched(), own = PAGE_LISTS[tab] || [], n = LISTS.reduce((a, k) => a + (own.includes(k) ? 0 : S.errs[k].length), 0); return n ? `<div class="panel warn">${n} line${n > 1 ? 's' : ''} can't be read. Fix ${n > 1 ? 'them' : 'it'} on the <button class="link" data-a="tab" data-v="data">Data</button> page.</div>` : ''; };
 
 /* ---------- events ---------- */
 const reCal = () => { const w = document.getElementById('calwrap'); if (w) w.innerHTML = calHtml(); };
 $app.addEventListener('click', e => {
   const b = e.target.closest('[data-a]'); if (!b) return;
   const a = b.dataset.a, v = b.dataset.v, u = now(), c = view.cur;
-  if (a === 'signin') return connect(known() ? '' : 'consent');
+  if (a === 'signin') { if (reauth) return; return connect(known() ? '' : 'consent'); }
   if (a === 'backup') return backup();
   if (a === 'tab') { view.tab = v; localStorage.setItem('dash-tab', v); return render(true); }
   if (a === 'mode') { view.mode = v; return reCal(); }
@@ -524,7 +603,16 @@ $app.addEventListener('click', e => {
   if (a === 'today') { view.cur = new Date(); return reCal(); }
   if (a === 'nav') { const k = +v; view.cur = view.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + k, 1) : new Date(c.getFullYear(), c.getMonth(), c.getDate() + k * (view.mode === 'week' ? 7 : 1)); return reCal(); }
   if (a === 'goday') { view.cur = new Date(v + 'T00:00'); view.mode = 'day'; return reCal(); }
-  if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[done [^\]]*\]/i, ''); return '### ' + l + ' [done ' + lineD(u) + ']'; });
+  if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[done [^\]]*\]/i, ''); return '### ' + l + ' [done ' + doneStamp(u) + ']'; });
+  if (a === 'hwnav') { view.hw = new Date(view.hw.getFullYear(), view.hw.getMonth(), view.hw.getDate() + 7 * +v); return render(true); }
+  if (a === 'hwnow') { view.hw = new Date(); return render(true); }
+  if (a === 'hwtog') { const q = isoWeek(view.hw), [y, w] = b.dataset.wk ? b.dataset.wk.split(':').map(Number) : [q.y, q.w], ci = +b.dataset.c, dk = b.dataset.d, i = +b.dataset.i; hwEdit(y, w, cls => { const l = cls[ci][1][dk][i]; cls[ci][1][dk][i] = /^###/.test(l) ? l.replace(/^###\s*/, '') : '### ' + l; }); return; }
+  if (a === 'hwedit') {
+    if (e.target.tagName === 'TEXTAREA') return;
+    const {y, w} = isoWeek(view.hw), ci = +b.dataset.c, k = b.dataset.d, lines = hwGet(y, w)[ci][1][k] || [];
+    b.innerHTML = `<textarea class="hwt" data-hw="1" data-c="${ci}" data-d="${k}" rows="${Math.max(3, lines.length + 1)}">${esc(lines.join('\n'))}</textarea>`;
+    const ta = b.querySelector('textarea'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); return;
+  }
   if (a === 'hab') lineOp('habit', +v, l => { const x = pHabit(l.trim()); if (!x) return l; const s = b.dataset.d; if (x.days[s]) delete x.days[s]; else x.days[s] = 1; return x.name + ' | ' + Object.keys(x.days).sort().join(', '); });
   if (a === 'delhab') lineOp('habit', +v, () => null);
   changed();
@@ -533,9 +621,15 @@ const CODE = {1: 'm', 2: 't', 3: 'w', 4: 'th', 5: 'f', 6: 'sa', 0: 'su'}, t24 = 
 function mkLine(k, d) {
   const t = (d.get('t') || '').trim().toLowerCase(); let p = '', ytag = 0;
   if (k === 'rec' || k === 'rtask') {
-    const ds = d.getAll('d').map(Number).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
-    if (!ds.length) { toast('Pick at least one day'); return; }
-    p = ds.length === 7 ? 'daily' : ds.map(i => CODE[i]).join('');
+    const ds = d.getAll('d').map(Number).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)), parts = [];
+    if (ds.length) parts.push(ds.length === 7 ? 'daily' : ds.map(i => CODE[i]).join(''));
+    if (k === 'rtask') {
+      const dm = (d.get('dm') || '').toLowerCase().split(/[,\s]+/).filter(Boolean).map(x => x === 'last' ? 'last' : (+x >= 1 && +x <= 31 ? ordS(+x).toLowerCase() : null));
+      if (dm.includes(null)) { toast('Day of month must be 1 to 31 or Last'); return; }
+      if (dm.length) parts.push(dm.join(','));
+    }
+    if (!parts.length) { toast('Pick at least one day'); return; }
+    p = parts.join(' ');
   } else if (k !== 'gen') {
     const mi = MON.indexOf((d.get('mo') || '').trim().slice(0, 3).toLowerCase()), da = +d.get('da');
     if (mi < 0 || !dateOk(2024, mi, da)) { toast('Month needs 3 letters (like Mar) and a valid day'); return; }
@@ -560,12 +654,27 @@ $app.addEventListener('input', e => {
   state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal(); const vs = document.getElementById('vis'); if (vs) vs.innerHTML = view.tab === 'tasks' ? tasksVis() : habitVis();
   const x = document.getElementById('err-' + k); if (x) x.innerHTML = errHtml(k);
 });
-$app.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.r) { view.range = +e.target.value; localStorage.setItem('dash-range', view.range); render(true); } });
+$app.addEventListener('change', e => {
+  const ds = e.target.dataset || {};
+  if (ds.r) { view.range = +e.target.value; localStorage.setItem('dash-range', view.range); render(true); }
+  else if (ds.hc != null) {
+    const v = e.target.value.trim().toLowerCase(), {y, w} = isoWeek(view.hw), cls = hwGet(y, w);
+    if (ds.hc === 'new') { if (!v) return; cls.push([v, {}]); }
+    else { const i = +ds.hc; if (!v) { if (Object.keys(cls[i][1]).length && !confirm('Delete this class and its assignments for this week?')) { render(true); return; } cls.splice(i, 1); } else cls[i][0] = v; }
+    hwWrite(y, w, cls); changed();
+  }
+});
 $app.addEventListener('focusout', e => {
-  const k = e.target.dataset && e.target.dataset.k; if (k !== 'task') return;
-  const nt = fixYears(e.target.value); if (nt === e.target.value) return;
-  e.target.value = nt; state.sched.task = {t: nt, u: now()}; changed(true);
-  const x = document.getElementById('err-task'); if (x) x.innerHTML = errHtml('task');
+  const t = e.target, ds = t.dataset || {};
+  if (ds.k === 'task' || ds.k === 'gen') {
+    const nt = fixLines(ds.k, t.value); if (nt === t.value) return;
+    t.value = nt; state.sched[ds.k] = {t: nt, u: now()}; changed(true);
+    const x = document.getElementById('err-' + ds.k); if (x) x.innerHTML = errHtml(ds.k);
+  } else if (ds.hw) {
+    const ci = +ds.c, k = ds.d, lines = t.value.split('\n').map(x => x.trim().toLowerCase()).filter(Boolean), {y, w} = isoWeek(view.hw), cls = hwGet(y, w);
+    if (JSON.stringify(lines) !== JSON.stringify(cls[ci][1][k] || [])) { if (lines.length) cls[ci][1][k] = lines; else delete cls[ci][1][k]; hwWrite(y, w, cls); changed(true); }
+    t.parentNode.innerHTML = hwLines(lines, ci, k);
+  }
 });
 $app.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('done-box')) view.dopen = e.target.open; }, true);
 function backup() {
@@ -574,6 +683,31 @@ function backup() {
   a.download = 'dashboard-backup-' + todayStr() + '.json'; a.click(); toast('Backup downloaded');
 }
 window.addEventListener('online', () => signedIn && pull());
+let drag = null;
+$app.addEventListener('pointerdown', e => {
+  const g = e.target.closest('[data-grip]'), row = g && g.closest('[data-gi]'); if (!row) return;
+  drag = {i: +row.dataset.gi, row, over: null}; row.classList.add('dragging'); e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY), r = el && el.closest('[data-gi]');
+  document.querySelectorAll('.dropt').forEach(x => x.classList.remove('dropt'));
+  drag.over = r && r !== drag.row ? r : null; if (drag.over) drag.over.classList.add('dropt');
+});
+document.addEventListener('pointerup', () => {
+  if (!drag) return; const d = drag; drag = null; d.row.classList.remove('dragging');
+  document.querySelectorAll('.dropt').forEach(x => x.classList.remove('dropt'));
+  if (!d.over) return;
+  const ls = state.sched.gen.t.split('\n'), m = ls.splice(d.i, 1)[0]; ls.splice(+d.over.dataset.gi, 0, m);
+  state.sched.gen = {t: ls.join('\n'), u: now()}; changed();
+});
+let reauth = false, lastFail = 0;
+function silent() {
+  if (reauth || signedIn || !tc || !known() || now() - lastFail < 30000) return;
+  reauth = true;
+  getToken('').then(() => { signedIn = true; return pull(true); }).then(() => startPolling()).catch(() => { lastFail = now(); status = 'offline'; render(); }).finally(() => { reauth = false; });
+}
+['click', 'keydown'].forEach(t => document.addEventListener(t, silent, true));
 state = norm(load() || {});
 setInterval(() => { if (view.tab === 'sched' && view.mode !== 'month') reCal(); }, 60000);
 render();
