@@ -94,7 +94,7 @@ input[type=number],.sm{flex:none;width:76px;background:var(--bg);border:1px soli
 .hring{display:flex;align-items:center;gap:12px}.foot{margin-top:24px;text-align:center}
 .tgw{overflow-x:auto}.tg.wide{min-width:600px}
 .tgr{display:grid;grid-template-columns:48px repeat(var(--n),minmax(0,1fr))}
-.tgd{padding:6px 2px;text-align:center;font-weight:500;border-radius:6px}.tgd.today{color:var(--acc)}.tgd:hover{background:var(--accsoft)}
+.tgd{padding:6px 2px;text-align:center;font-weight:500;border-radius:6px}.tgd.today{color:var(--acc);background:var(--accsoft)}.tgd:hover{background:var(--accsoft)}
 .tgut{position:relative}.tgut span{position:absolute;right:6px;transform:translateY(-50%);font-size:11px;color:var(--mute)}.tgut span:first-child{transform:none}
 .tcol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% 44px}
 .blk{position:absolute;overflow:hidden;box-sizing:border-box;padding:2px 4px;font-size:11px;line-height:1.25;border-radius:6px;border:1px solid var(--bg);font-weight:500}
@@ -137,10 +137,12 @@ select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(-
 .hd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}.dt{color:var(--mute);font-size:15px}
 header{margin-bottom:12px}
 .hw td.tdy{background:var(--accsoft)}
-.dcols{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dcols{grid-template-columns:minmax(0,310px) minmax(0,310px) minmax(0,1fr)}
 .tabs .la{margin-left:auto;display:flex;align-items:center;gap:6px;flex:none}.tabs{align-items:center}
 textarea.pad{min-height:340px;margin:0;font:14px/1.5 var(--sans);resize:vertical}
 @media(max-width:900px){.dcols{display:flex;flex-direction:column;gap:16px}.dcol{display:contents}.o0{order:0}.o1{order:1}.o2{order:2}.o3{order:3}.o4{order:4}.o5{order:5}.o6{order:6}.o7{order:7}}
+.sub{margin:0 0 4px;font-size:13px;font-weight:500;color:var(--mute)}
+.sep{border-top:1px solid var(--line);margin:10px 0 8px}
 </style>
 </head>
 <body>
@@ -510,15 +512,14 @@ function homeP() {
   const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay(), hw = hwItems(t);
   return `<div class="dcols"><div class="dcol">
   <div class="panel o1"><h2>Today</h2>${agenda(t)}</div>
-  <div class="panel o4"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div>
-  <div class="panel o5"><h2>Approaching Tasks</h2>${apT.map(x => x.h).join('') || none('Nothing Due Soon.')}</div></div>
+  <div class="panel o3"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div></div>
   <div class="dcol">
-  <div class="panel o2"><h2>HW Due Today</h2>${hw.map(hwRow).join('') || none('No HW Due Today.')}</div>
-  <div class="panel o3"><h2>Tasks Today</h2>${due.map(x => taskRow(x, 'task')).join('')}${rt.map(rtRow).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div>
-  <div class="panel o6"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || none('No General Tasks.')}</div></div>
+  <div class="panel o2"><h2>Tasks Today</h2><h3 class="sub">HW</h3>${hw.map(hwRow).join('') || none('No HW Due Today.')}<div class="sep"></div><h3 class="sub">Tasks</h3>${due.map(x => taskRow(x, 'task')).join('')}${rt.map(rtRow).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div>
+  <div class="panel o4"><h2>Approaching Tasks</h2>${apT.map(x => x.h).join('') || none('Nothing Due Soon.')}</div>
+  <div class="panel o5"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || none('No General Tasks.')}</div></div>
   <div class="dcol">
   <div class="panel qbox o0">${q ? `<div class="qq">${esc(q.q)}</div>${q.a ? `<div class="qa">\u2014 ${esc(q.a)}</div>` : ''}` : '<div class="qa">Add quotes on the Data page.</div>'}</div>
-  <div class="panel o7"><h2>Notepad</h2><textarea class="pad" data-k="note" spellcheck="true" aria-label="Notepad">${esc(state.sched.note.t)}</textarea></div></div></div>`;
+  <div class="panel o6"><h2>Notepad</h2><textarea class="pad" data-k="note" spellcheck="true" aria-label="Notepad">${esc(state.sched.note.t)}</textarea></div></div></div>`;
 }
 
 const hwLines = (items, ci, dk, pv) => items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(nice(l.replace(/^###\s*/, '')))}</span></div>`; }).join('') || '<span class="hph">+</span>';
