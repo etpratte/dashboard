@@ -137,12 +137,16 @@ select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(-
 .hd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}.dt{color:var(--mute);font-size:15px}
 header{margin-bottom:12px}
 .hw td.tdy{background:var(--accsoft)}
-.dcols{grid-template-columns:minmax(0,310px) minmax(0,310px) minmax(0,1fr)}
+.dcols{grid-template-columns:minmax(0,310fr) minmax(0,310fr) minmax(0,572fr)}
 .tabs .la{margin-left:auto;display:flex;align-items:center;gap:6px;flex:none}.tabs{align-items:center}
-textarea.pad{min-height:340px;margin:0;font:14px/1.5 var(--sans);resize:vertical}
+textarea.pad{min-height:160px;margin:0;font:14px/1.5 var(--sans);resize:none;overflow:hidden}
 @media(max-width:900px){.dcols{display:flex;flex-direction:column;gap:16px}.dcol{display:contents}.o0{order:0}.o1{order:1}.o2{order:2}.o3{order:3}.o4{order:4}.o5{order:5}.o6{order:6}.o7{order:7}}
 .sub{margin:0 0 4px;font-size:13px;font-weight:500;color:var(--mute)}
 .sep{border-top:1px solid var(--line);margin:10px 0 8px}
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}.cols3>.panel{margin:0}
+.cols2+.panel,.cols3+.panel,.cols2+.cols3{margin-top:16px}#calwrap{margin-bottom:16px}
+.mcols{column-count:3;column-gap:16px;margin-top:16px}.mcols>.panel{break-inside:avoid;margin:0 0 16px;display:block}
+@media(max-width:900px){.cols3{grid-template-columns:1fr}.mcols{column-count:1}}
 </style>
 </head>
 <body>
@@ -475,7 +479,7 @@ const hToday = () => { const t = todayStr(), h = getSched().habit; return {tot: 
 function streak(h) { const d = new Date(); let n = 0; if (!h.days[ymd(d)]) d.setDate(d.getDate() - 1); while (h.days[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
 
 /* ---------- render ---------- */
-const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['tasks', 'Tasks'], ['hw', 'HW'], ['habit', 'Habits'], ['data', 'Data']];
+const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['hw', 'HW'], ['tasks', 'Tasks'], ['habit', 'Habits'], ['data', 'Data']];
 const statusText = () => ({synced: 'Synced', syncing: 'Syncing\u2026', saving: 'Saving\u2026', error: 'Sync Failed, Will Retry', offline: 'Not Synced'}[status]);
 function render(force) {
   if (!signedIn && !known()) {
@@ -484,11 +488,12 @@ function render(force) {
   }
   if (!force && $app.querySelector('input:focus,textarea:focus')) { const s = document.getElementById('sync'); if (s) s.textContent = statusText(); return; }
   const d = new Date();
-  $app.style.maxWidth = view.tab === 'home' ? '1320px' : '';
+  $app.style.maxWidth = view.tab === 'home' ? '1256px' : '';
   $app.innerHTML = `<header><div class="hd"><h1>Big Guy Life Dashboard</h1><span class="dt">${d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'})}</span></div>
   <div class="sync"><span id="sync">${statusText()}</span> ${signedIn ? '' : '<button class="btn" data-a="signin">Sign In To Sync</button>'}</div></header>
   <nav class="tabs">${TABS.map(([k, n]) => `<button class="tab${view.tab === k ? ' on' : ''}" data-a="tab" data-v="${k}">${n}</button>`).join('')}${view.tab === 'home' ? lookSel() : ''}</nav>
   ${view.tab === 'data' ? '' : errBanner(view.tab)}${({home: homeP, sched: schedP, tasks: tasksP, hw: hwP, habit: habitP, data: dataP})[view.tab]()}`;
+  $app.querySelectorAll('textarea.pad').forEach(fit);
   if (view.rf) { const el = $app.querySelector(`[name="${view.rf}"]`); view.rf = null; if (el) el.focus(); }
 }
 
@@ -580,7 +585,7 @@ function schedP() {
   const onceF = `<form data-f="once">${md}${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form>`;
   const recF = `<form data-f="rec"><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div>${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form>`;
   const bdayF = `<form data-f="bday">${md}<input type="number" name="yr" min="1900" max="2100" placeholder="Year"><input type="text" name="t" placeholder="Name" required><button class="btn">Add</button></form>`;
-  return `<div class="panel" id="calwrap">${calHtml()}</div>${ed('once', onceF)}${ed('rec', recF)}${ed('bday', bdayF)}`;
+  return `<div class="panel" id="calwrap">${calHtml()}</div><div class="cols2">${ed('once', onceF)}${ed('rec', recF)}</div>${ed('bday', bdayF)}`;
 }
 
 const addLine = (k, line) => { const cur = state.sched[k].t; state.sched[k] = {t: (cur && !/\n$/.test(cur) ? cur + '\n' : cur) + line, u: now()}; };
@@ -598,12 +603,12 @@ function tasksVis() {
   const S = getSched(), open = S.task.filter(x => !x.k || recent(x)).sort((a, b) => a.due - b.due), gen = S.gen.filter(x => !x.k || recent(x));
   const done = [...S.task.map(x => [x, 'task']), ...S.gen.map(x => [x, 'gen'])].filter(([x]) => x.k).sort((a, b) => (b[0].done || 0) - (a[0].done || 0));
   const md = `<input type="text" class="sm" name="mo" placeholder="Mar" maxlength="3" autocapitalize="off" required><input type="number" name="da" min="1" max="31" placeholder="Day" required>`;
-  return `<div class="cols2"><div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No Dated Tasks.</div>'}<form data-f="task"><input type="text" name="t" placeholder="Task (Due Date Required)" required>${md}<button class="btn">Add</button></form></div>
+  return `<div class="cols3"><div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No Dated Tasks.</div>'}<form data-f="task"><input type="text" name="t" placeholder="Task (Due Date Required)" required>${md}<button class="btn">Add</button></form></div>
   <div class="panel"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<form data-f="gen"><input type="text" name="t" placeholder="General Task" required><button class="btn">Add</button></form></div>
-  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(rtRow).join('') || '<div class="empty">No Recurring Tasks.</div>'}<form data-f="rtask"><input type="text" name="t" placeholder="Recurring Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" name="dm" placeholder="Day Of Month (1, 15, Last)"><button class="btn">Add</button></form><p class="tag">Recurring tasks can't be checked off yet.</p></div>
-  <div class="panel"><h2>Checked Off (${done.length})</h2>${done.map(([x, l]) => taskRow(x, l)).join('') || '<div class="empty">Nothing Checked Yet.</div>'}</div></div>`;
+  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(rtRow).join('') || '<div class="empty">No Recurring Tasks.</div>'}<form data-f="rtask"><input type="text" name="t" placeholder="Recurring Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" name="dm" placeholder="Day Of Month (1, 15, Last)"><button class="btn">Add</button></form><p class="tag">Recurring tasks can't be checked off yet.</p></div></div>
+  <div class="panel"><h2>Checked Off (${done.length})</h2>${done.map(([x, l]) => taskRow(x, l)).join('') || '<div class="empty">Nothing Checked Yet.</div>'}</div>`;
 }
-const tasksP = () => `<div id="vis">${tasksVis()}</div>${ed('task')}${ed('gen')}${ed('rtask')}`;
+const tasksP = () => `<div id="vis">${tasksVis()}</div><div class="cols3">${ed('task')}${ed('gen')}${ed('rtask')}</div>`;
 function habitVis() {
   const h = getSched().habit, days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
   return `<div class="panel"><h2>Habits</h2>${h.length ? `<div class="hhead">${days.map(d => `<span>${d.toLocaleDateString(undefined, {weekday: 'narrow'})}</span>`).join('')}</div>` : ''}${h.map(x => `<div class="row"><span class="t">${esc(nice(x.name))} <span class="tag">\uD83D\uDD25${streak(x)}</span></span><span class="strip">${days.map(d => { const s = ymd(d); return `<button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button>`; }).join('')}</span><button class="x" data-a="delhab" data-v="${x.i}" aria-label="Delete">\u2715</button></div>`).join('') || '<div class="empty">No Habits Yet.</div>'}
@@ -624,11 +629,12 @@ const LIST_META = [
   ['note', 'Notepad', 'Free text. The notepad on the dashboard edits this same box.'],
   ['quote', 'Quotes', 'One quote per line, with an optional author after a dash: "The only way out is through" - Robert Frost. Type the quotation marks yourself if you want them. The dashboard shows one each day.']
 ];
-const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><button class="btn" data-a="backup">Download Backup</button></div><p class="tag">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}`;
+const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><button class="btn" data-a="backup">Download Backup</button></div><p class="tag">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div><div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
 const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], tasks: ['task', 'rtask', 'gen'], habit: ['habit']};
 const errBanner = tab => { const S = getSched(), own = PAGE_LISTS[tab] || [], n = LISTS.reduce((a, k) => a + (own.includes(k) ? 0 : S.errs[k].length), 0); return n ? `<div class="panel warn">${n} line${n > 1 ? 's' : ''} can't be read. Fix ${n > 1 ? 'them' : 'it'} on the <button class="link" data-a="tab" data-v="data">Data</button> page.</div>` : ''; };
 
 /* ---------- events ---------- */
+const fit = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; };
 const reCal = () => { const w = document.getElementById('calwrap'); if (w) w.innerHTML = calHtml(); };
 $app.addEventListener('click', e => {
   const b = e.target.closest('[data-a]'); if (!b) return;
@@ -693,6 +699,7 @@ $app.addEventListener('submit', e => {
   changed();
 });
 $app.addEventListener('input', e => {
+  if (e.target.classList && e.target.classList.contains('pad')) fit(e.target);
   const k = e.target.dataset && e.target.dataset.k; if (!k) return;
   state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal(); const vs = document.getElementById('vis'); if (vs) vs.innerHTML = view.tab === 'tasks' ? tasksVis() : habitVis();
   const x = document.getElementById('err-' + k); if (x) x.innerHTML = errHtml(k);
@@ -725,6 +732,7 @@ function backup() {
   a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'}));
   a.download = 'dashboard-backup-' + todayStr() + '.json'; a.click(); toast('Backup downloaded');
 }
+window.addEventListener('resize', () => document.querySelectorAll('textarea.pad').forEach(fit));
 window.addEventListener('online', () => signedIn && pull());
 let drag = null;
 $app.addEventListener('pointerdown', e => {
