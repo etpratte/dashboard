@@ -171,6 +171,8 @@ input.desc{flex:1 1 100%;width:100%}input.dm{flex:1 1 130px}
 .hab .hbc{text-align:center;vertical-align:middle}.hab .chk{margin:4px auto}.hab .chk.on{background:var(--ok);border-color:var(--ok)}
 .hstk{font-size:11px;color:var(--mute);padding-left:4px}
 .dt-top{box-shadow:0 -2px 0 var(--acc)}.dt-bot{box-shadow:0 2px 0 var(--acc)}
+.rlf{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.rlf input{flex:1 1 220px}
+textarea.code{font-size:12px;margin:8px 0}.steps{margin:8px 0;padding-left:20px;color:var(--mute);font-size:13px}.setup{margin-top:6px}
 </style>
 </head>
 <body>
@@ -192,7 +194,13 @@ const now = () => Date.now();
 
 let state = {};
 let view = {tab: ['home', 'sched', 'tasks', 'hw', 'habit', 'data'].includes(localStorage.getItem('dash-tab')) ? localStorage.getItem('dash-tab') : 'home', mode: 'week', cur: new Date(), hw: new Date(), hab: new Date(), help: localStorage.getItem('dash-help') === '1', range: +localStorage.getItem('dash-range') || 14};
-let token = null, exp = 0, tc = null, fileId = null, status = 'offline', signedIn = false;
+(function () {
+  if (typeof location === 'undefined') return;
+  const m = /^#relay=(.+)$/.exec(location.hash); if (!m) return;
+  try { const r = JSON.parse(decodeURIComponent(m[1])); if (r.url && r.key) localStorage.setItem('dash-relay', JSON.stringify(r)); } catch (e) {}
+  history.replaceState(null, '', location.pathname + location.search);
+})();
+let token = null, exp = 0, tc = null, fileId = null, status = 'offline', signedIn = !!relay();
 const known = () => !!localStorage.getItem('dash-in');
 let saveTimer = null, busy = false;
 
@@ -210,7 +218,25 @@ function mergeArr(a = [], b = [], nested) {
 const merge = (a, b) => { a = norm({...a}); b = norm({...b}); const sched = {}; LISTS.forEach(k => { sched[k] = pick(a.sched[k], b.sched[k]); }); return norm({...b, ...a, sched}); };
 
 /* ---------- Google auth + Drive ---------- */
+function relay() { try { const r = JSON.parse(localStorage.getItem('dash-relay')); return r && r.url && r.key ? r : null; } catch (e) { return null; } }
+async function relayGet(r) {
+  const res = await fetch(r.url + (r.url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(r.key)), j = await res.json();
+  if (j && j.error) throw new Error(j.error);
+  return j && Object.keys(j).length ? j : null;
+}
+async function relayPut(r, data) {
+  const res = await fetch(r.url, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({key: r.key, data})}), j = await res.json();
+  if (!j || !j.ok) throw new Error((j && j.error) || 'save failed');
+}
+async function relayConnect(url, key) {
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url) || !key) { toast('Paste The Web App URL That Ends In /exec'); return; }
+  try { await relayGet({url, key}); } catch (e) { toast('Could Not Connect. Check The URL And Key'); return; }
+  localStorage.setItem('dash-relay', JSON.stringify({url, key})); localStorage.removeItem('dash-rkey');
+  signedIn = true; status = 'syncing'; render(true);
+  await pull(true); startPolling();
+}
 function initAuth() {
+  if (relay()) { signedIn = true; pull(true); startPolling(); return; }
   if (!window.google || !google.accounts) return setTimeout(initAuth, 200);
   tc = google.accounts.oauth2.initTokenClient({client_id: CLIENT_ID, scope: SCOPE, callback: () => {}});
   try { const k = JSON.parse(localStorage.getItem('dash-tok')); if (k && k.exp > now()) { token = k.t; exp = k.exp; signedIn = true; pull(true); startPolling(); return; } } catch (e) {}
@@ -244,11 +270,13 @@ async function findFile() {
   return r.files[0] ? r.files[0].id : null;
 }
 async function readRemote() {
+  const rl = relay(); if (rl) return relayGet(rl);
   if (!fileId) fileId = await findFile();
   if (!fileId) return null;
   return (await api('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media')).json();
 }
 async function writeRemote(data) {
+  const rl = relay(); if (rl) return relayPut(rl, data);
   const body = JSON.stringify(data);
   if (fileId) { await api('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body}); return; }
   const b = 'dashb' + uid(), meta = JSON.stringify({name: FILE, parents: ['appDataFolder']});
@@ -268,7 +296,7 @@ async function pull(first) {
 }
 function startPolling() {
   if (startPolling.on) return; startPolling.on = true;
-  setInterval(() => { if (!document.hidden && signedIn && !saveTimer) pull(); }, 25000);
+  setInterval(() => { if (!document.hidden && signedIn && !saveTimer && (!relay() || now() - (startPolling.t || 0) > 55000)) { startPolling.t = now(); pull(); } }, 25000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && signedIn && !saveTimer) pull(); });
 }
 function changed(quiet) {
@@ -532,7 +560,7 @@ function hwItems(t) {
   hwGet(y, w).forEach(([n, dd], ci) => (dd[dk] || []).forEach((l, i) => out.push({n, l, ci, i, dk, wk: y + ':' + w})));
   return out;
 }
-const hwRow = x => { const dn = /^###/.test(x.l); return `<div class="row${dn ? ' hwd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-wk="${x.wk}" data-c="${x.ci}" data-d="${x.dk}" data-i="${x.i}" aria-label="Toggle Done"></button><span class="t">${esc(x.n.toUpperCase())}: ${esc(x.l.replace(/^###\s*/, '').toLowerCase())}</span></div>`; };
+const hwRow = x => { const dn = /^###/.test(x.l); return `<div class="row${dn ? ' hwd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-wk="${x.wk}" data-c="${x.ci}" data-d="${x.dk}" data-i="${x.i}" aria-label="Toggle Done"></button><span class="t">${esc(x.n.toUpperCase())}: ${esc(x.l.replace(/^###\s*/, ''))}</span></div>`; };
 const rtOn = (x, d) => x.days.has(d.getDay()) || x.dom.has(d.getDate()) || (x.dom.has(-1) && new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() === d.getDate());
 const lookSel = () => `<label class="la"><span class="tag">Look Ahead</span><select data-r="1" aria-label="Look Ahead Days">${[7, 14, 30, 60].map(n => `<option value="${n}"${n === view.range ? ' selected' : ''}>${n} Days</option>`).join('')}</select></label>`;
 function homeP() {
@@ -555,7 +583,7 @@ function homeP() {
   <div class="panel o6"><h2>Notepad</h2><textarea class="pad" data-k="note" spellcheck="true" aria-label="Notepad">${esc(state.sched.note.t)}</textarea></div></div></div>`;
 }
 
-const hwLines = (items, ci, dk, pv) => items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(l.replace(/^###\s*/, '').toLowerCase())}</span></div>`; }).join('') || '<span class="hph">+</span>';
+const hwLines = (items, ci, dk, pv) => items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(l.replace(/^###\s*/, ''))}</span></div>`; }).join('') || '';
 function hwP() {
   const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i);
   const {y, w} = hwWk(false), cls = hwGet(y, w), td = todayStr();
@@ -661,7 +689,32 @@ const LIST_META = [
   ['note', 'Notepad', 'Free text. The notepad on the dashboard edits this same box.'],
   ['quote', 'Quotes', 'One quote per line, with an optional author after a dash: "The only way out is through" - Robert Frost. Type the quotation marks yourself if you want them. The dashboard shows one each day.']
 ];
-const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><label class="tgl"><input type="checkbox" data-hlp="1"${view.help ? ' checked' : ''}><span class="knob"></span><span>Show Instructions</span></label><button class="btn" data-a="backup">Download Backup</button></div><p class="tag hint">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div><div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
+const genKey = () => { let k = localStorage.getItem('dash-rkey'); if (!k) { const a = new Uint8Array(18); crypto.getRandomValues(a); k = [...a].map(x => x.toString(16).padStart(2, '0')).join(''); localStorage.setItem('dash-rkey', k); } return k; };
+const gsCode = k => [
+  "const KEY = '" + k + "';",
+  "const NAME = 'big-guy-dashboard.json';",
+  "function file_() { const it = DriveApp.getFilesByName(NAME); return it.hasNext() ? it.next() : DriveApp.createFile(NAME, '{}', MimeType.PLAIN_TEXT); }",
+  "function out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }",
+  "function doGet(e) {",
+  "  if (!e.parameter || e.parameter.key !== KEY) return out_({error: 'denied'});",
+  "  return ContentService.createTextOutput(file_().getBlob().getDataAsString()).setMimeType(ContentService.MimeType.JSON);",
+  "}",
+  "function doPost(e) {",
+  "  var b; try { b = JSON.parse(e.postData.contents); } catch (x) { return out_({error: 'bad request'}); }",
+  "  if (b.key !== KEY) return out_({error: 'denied'});",
+  "  var lock = LockService.getScriptLock(); lock.waitLock(10000);",
+  "  try { file_().setContent(JSON.stringify(b.data)); } finally { lock.releaseLock(); }",
+  "  return out_({ok: true});",
+  "}"
+].join('\n');
+function relayPanel() {
+  if (relay()) return `<div class="panel" style="margin-top:16px"><div class="tb"><h2 style="margin:0;flex:1">Always-On Sync</h2><button class="btn" data-a="relaycopy">Copy Phone Link</button><button class="ghost" data-a="relaydisc">Disconnect</button></div><p class="tag">Connected. This device syncs without a Google sign-in, so it stays signed in. Open the phone link once on each other device. Keep that link private.</p></div>`;
+  const k = genKey();
+  return `<div class="panel" style="margin-top:16px"><h2>Always-On Sync</h2><p class="tag">Optional. Syncs through a small script in your own Google account, so no hourly sign-in on any device.</p>
+  <details class="setup"><summary class="ghost">Setup Steps</summary><ol class="steps"><li>Go to script.google.com and click New project.</li><li>Delete what is there, paste the code below, and save.</li><li>Click Deploy, then New deployment, then the gear and Web app. Set Execute as: Me and Who has access: Anyone, then Deploy.</li><li>Click Authorize access, choose your account, and continue past the unverified screen (Advanced, then Go to project).</li><li>Copy the Web app URL, paste it below with the key, and press Connect.</li></ol><textarea class="code" readonly rows="9">${esc(gsCode(k))}</textarea><button class="btn" data-a="relaycode">Copy Code</button></details>
+  <div class="rlf"><input type="text" id="rl-url" placeholder="Web App URL" autocomplete="off"><input type="text" id="rl-key" value="${k}" placeholder="Key" autocomplete="off"><button class="btn" data-a="relayconnect">Connect</button></div></div>`;
+}
+const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><label class="tgl"><input type="checkbox" data-hlp="1"${view.help ? ' checked' : ''}><span class="knob"></span><span>Show Instructions</span></label><button class="btn" data-a="backup">Download Backup</button></div><p class="tag hint">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${relayPanel()}<div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
 const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], tasks: ['task', 'rtask', 'gen']};
 const errBanner = tab => { const S = getSched(), own = PAGE_LISTS[tab] || [], n = LISTS.reduce((a, k) => a + (own.includes(k) ? 0 : S.errs[k].length), 0); return n ? `<div class="panel warn">${n} line${n > 1 ? 's' : ''} can't be read. Fix ${n > 1 ? 'them' : 'it'} on the <button class="link" data-a="tab" data-v="data">Data</button> page.</div>` : ''; };
 
@@ -687,6 +740,10 @@ const reCal = () => { const w = document.getElementById('calwrap'); if (w) w.inn
 $app.addEventListener('click', e => {
   const b = e.target.closest('[data-a]'); if (!b) return;
   const a = b.dataset.a, v = b.dataset.v, u = now(), c = view.cur;
+  if (a === 'relayconnect') { relayConnect(document.getElementById('rl-url').value.trim(), document.getElementById('rl-key').value.trim()); return; }
+  if (a === 'relaycopy') { const r = relay(); if (r) { const link = location.origin + location.pathname + '#relay=' + encodeURIComponent(JSON.stringify(r)); if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => toast('Link Copied'), () => prompt('Copy This Link', link)); else prompt('Copy This Link', link); } return; }
+  if (a === 'relaydisc') { if (confirm('Disconnect always-on sync on this device?')) { localStorage.removeItem('dash-relay'); signedIn = false; status = 'offline'; render(true); } return; }
+  if (a === 'relaycode') { const ta = $app.querySelector('textarea.code'); if (navigator.clipboard) navigator.clipboard.writeText(ta.value); else { ta.select(); document.execCommand('copy'); } toast('Code Copied'); return; }
   if (a === 'addopen') { const bx = b.closest('.addbox'); bx.classList.add('open'); const f1 = bx.querySelector('input'); if (f1) f1.focus(); return; }
   if (a === 'signin') { if (reauth) return; return connect(known() ? '' : 'consent'); }
   if (a === 'backup') return backup();
@@ -790,7 +847,7 @@ $app.addEventListener('focusout', e => {
     t.value = nt; state.sched[ds.k] = {t: nt, u: now()}; changed(true);
     const x = document.getElementById('err-' + ds.k); if (x) x.innerHTML = errHtml(ds.k);
   } else if (ds.hw) {
-    const ci = +ds.c, k = ds.d, pv = ds.pv === '1', lines = t.value.split('\n').map(x => x.trim().toLowerCase()).filter(Boolean);
+    const ci = +ds.c, k = ds.d, pv = ds.pv === '1', lines = t.value.split('\n').map(x => x.trim()).filter(Boolean);
     if (JSON.stringify(lines) !== JSON.stringify(hwCellItems(ci, k, pv))) hwMod(ci, k, pv, () => lines, true);
     t.parentNode.innerHTML = hwLines(lines, ci, k, pv);
   }
