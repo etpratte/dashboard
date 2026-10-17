@@ -142,7 +142,7 @@ header{margin-bottom:12px}
 textarea.pad{min-height:160px;margin:0;font:14px/1.5 var(--sans);resize:none;overflow:hidden}
 @media(max-width:900px){.dcols{display:flex;flex-direction:column;gap:16px}.dcol{display:contents}.o0{order:0}.o1{order:1}.o2{order:2}.o3{order:3}.o4{order:4}.o5{order:5}.o6{order:6}.o7{order:7}}
 .sub{margin:0 0 4px;font-size:13px;font-weight:500;color:var(--mute)}
-.sep{border-top:1px solid var(--line);margin:10px 0 8px}
+.sep{border-top:3px solid var(--line);margin:10px 0 8px}
 .cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}.cols3>.panel{margin:0}
 .cols2+.panel,.cols3+.panel,.cols2+.cols3{margin-top:16px}#calwrap{margin-bottom:16px}
 .mcols{column-count:3;column-gap:16px;margin-top:16px}.mcols>.panel{break-inside:avoid;margin:0 0 16px;display:block}
@@ -157,6 +157,20 @@ input.tm{flex:none;width:130px}
 .knob::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--ink);transition:transform .15s}
 .tgl input:checked+.knob{background:var(--acc)}.tgl input:checked+.knob::after{transform:translateX(16px);background:var(--bg)}
 .tgl input:focus-visible+.knob{outline:2px solid var(--acc);outline-offset:2px}
+input.sm{flex:none;width:84px}input.dy{flex:none;width:58px}input.yr{flex:none;width:76px}
+input.tm{flex:none;width:96px}
+input.desc{flex:1 1 100%;width:100%}input.dm{flex:1 1 130px}
+.navs{display:inline-flex;align-items:center;gap:2px}
+.nb{display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 12px;line-height:1;font-size:15px}
+.nb.arr{font-size:26px;padding:0 12px 4px}
+.rng{font-size:.65em;color:var(--mute);font-weight:500;margin-left:10px;white-space:nowrap}
+.hw tr.addrow td{border:0;background:transparent}.hcin.nc{text-transform:none}
+.hl .chk{display:block;position:relative;width:16px;height:16px;min-width:16px;flex:none;padding:0}
+.hl .chk.on::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--bg);border-width:0 2px 2px 0;transform:rotate(45deg);box-sizing:content-box}
+.hl>span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.hab .hbc{text-align:center;vertical-align:middle}.hab .chk{margin:4px auto}.hab .chk.on{background:var(--ok);border-color:var(--ok)}
+.hstk{font-size:11px;color:var(--mute);padding-left:4px}
+.dt-top{box-shadow:0 -2px 0 var(--acc)}.dt-bot{box-shadow:0 2px 0 var(--acc)}
 </style>
 </head>
 <body>
@@ -177,7 +191,7 @@ const todayStr = () => ymd(new Date());
 const now = () => Date.now();
 
 let state = {};
-let view = {tab: ['home', 'sched', 'tasks', 'hw', 'habit', 'data'].includes(localStorage.getItem('dash-tab')) ? localStorage.getItem('dash-tab') : 'home', mode: 'week', cur: new Date(), hw: new Date(), help: localStorage.getItem('dash-help') === '1', range: +localStorage.getItem('dash-range') || 14};
+let view = {tab: ['home', 'sched', 'tasks', 'hw', 'habit', 'data'].includes(localStorage.getItem('dash-tab')) ? localStorage.getItem('dash-tab') : 'home', mode: 'week', cur: new Date(), hw: new Date(), hab: new Date(), help: localStorage.getItem('dash-help') === '1', range: +localStorage.getItem('dash-range') || 14};
 let token = null, exp = 0, tc = null, fileId = null, status = 'offline', signedIn = false;
 const known = () => !!localStorage.getItem('dash-in');
 let saveTimer = null, busy = false;
@@ -511,6 +525,7 @@ function render(force) {
 }
 
 const recent = x => x.k && x.done && now() - x.done < 864e5;
+const wd2 = d => d.toLocaleDateString(undefined, {weekday: 'short'}) + ' ' + d.getDate();
 const wd = d => d.toLocaleDateString(undefined, {weekday: 'short'}) + ' ' + fmtD(d);
 function hwItems(t) {
   const {y, w} = isoWeek(t), dk = HWD[(t.getDay() + 6) % 7], out = [];
@@ -530,9 +545,9 @@ function homeP() {
   const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay(), hw = hwItems(t);
   return `<div class="dcols"><div class="dcol">
   <div class="panel o1"><h2>Today</h2>${agenda(t)}</div>
-  <div class="panel o3"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div></div>
+  <div class="panel o3"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd2(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div></div>
   <div class="dcol">
-  <div class="panel o2"><h2>Tasks Today</h2><h3 class="sub">HW</h3>${hw.map(hwRow).join('') || none('No HW Due Today.')}<div class="sep"></div><h3 class="sub">Tasks</h3>${due.map(x => taskRow(x, 'task')).join('')}${rt.map(rtRow).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div>
+  <div class="panel o2"><h2>Tasks Today</h2><h3 class="sub">HW</h3><div class="grp">${hw.map(hwRow).join('') || none('No HW Due Today.')}</div><div class="sep"></div><h3 class="sub">Tasks</h3><div class="grp">${due.map(x => taskRow(x, 'task')).join('')}${rt.map(rtRow).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div></div>
   <div class="panel o4"><h2>Approaching Tasks</h2>${apT.map(x => x.h).join('') || none('Nothing Due Soon.')}</div>
   <div class="panel o5"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || none('No General Tasks.')}</div></div>
   <div class="dcol">
@@ -545,8 +560,8 @@ function hwP() {
   const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i);
   const {y, w} = hwWk(false), cls = hwGet(y, w), td = todayStr();
   const days = [{k: 'sun', d: at(0), pv: true}, ...HWD.slice(0, 6).map((k, i) => ({k, d: at(i + 1), pv: false}))];
-  return `<div class="panel"><div class="tb"><div style="flex:1"><h2 style="margin:0">${y}: Week ${w}</h2><div class="tag">${fmtD(at(0))} \u2013 ${fmtD(at(6))}</div></div><span><button class="ghost nav" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost" data-a="hwnow">Now</button><button class="ghost nav" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
-  <div class="hww"><table class="hw"><thead><tr><th>Class</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Class Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwLines(hwCellItems(ci, x.k, x.pv), ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr><td class="hcn"><input class="hcin" data-hc="new" placeholder="+ Add Class" aria-label="Add Class"></td><td colspan="7"></td></tr></tbody></table></div>
+  return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="hwnow">Now</button><button class="ghost nb arr" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
+  <div class="hww"><table class="hw"><thead><tr><th>Class</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Class Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwLines(hwCellItems(ci, x.k, x.pv), ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Class" aria-label="Add Class"></td><td colspan="7"></td></tr></tbody></table></div>
   <p class="tag hint">Click a cell to type assignments, one per line. Click a circle to mark one done. Edit a class name in the first column; clear it to remove the class.</p></div>`;
 }
 
@@ -557,8 +572,10 @@ function lanes(list) {
   list.forEach(e => { if (grp.length && e.s >= gend) { flush(); gend = -1; } grp.push(e); gend = Math.max(gend, e.en); });
   flush(); return out;
 }
-function gridHtml(days) {
-  const evs = days.map(d => eventsOn(d)); let lo = 8;
+const rangeS = (a, b) => a.getMonth() === b.getMonth() ? a.toLocaleDateString(undefined, {month: 'short'}) + ' ' + a.getDate() + '-' + b.getDate() : fmtD(a) + '-' + fmtD(b);
+const weekTitle = st => { const {y, w} = isoWeek(new Date(st.getFullYear(), st.getMonth(), st.getDate() + 1)); return `${y}: Week ${w}<span class="rng">${rangeS(st, new Date(st.getFullYear(), st.getMonth(), st.getDate() + 6))}</span>`; };
+function gridHtml(days, rec) {
+  const evs = days.map(d => eventsOn(d, rec !== false)); let lo = 8;
   const en = e => Math.min(1440, e.e != null ? (e.e > e.s ? e.e : 1440) : e.s + 60);
   evs.forEach(a => a.forEach(e => { if (e.s != null) lo = Math.min(lo, Math.floor(e.s / 60)); }));
   const hi = 24, H = (hi - lo) * PX, td = todayStr();
@@ -581,10 +598,10 @@ function calHtml() {
     body = `<div class="grid">${cells}</div><div class="dayview"><h3>${fmtL(c)}</h3>${agenda(c, false)}</div>`;
   } else if (m === 'week') {
     const s = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
-    title = fmtD(s) + ' \u2013 ' + fmtD(e);
+    title = weekTitle(s);
     body = gridHtml([...Array(7)].map((_, i) => new Date(s.getFullYear(), s.getMonth(), s.getDate() + i)));
-  } else { title = fmtL(c); body = gridHtml([c]); }
-  return `<div class="tb"><h2 style="margin:0;flex:1">${title}</h2><span class="seg">${['month', 'week', 'day'].map(x => `<button class="${m === x ? 'on' : ''}" data-a="mode" data-v="${x}">${cap(x)}</button>`).join('')}</span><span><button class="ghost nav" data-a="nav" data-v="-1" aria-label="Previous">\u2039</button><button class="ghost" data-a="today">Now</button><button class="ghost nav" data-a="nav" data-v="1" aria-label="Next">\u203A</button></span></div>${body}`;
+  } else { title = fmtL(c); body = gridHtml([c], false); }
+  return `<div class="tb"><h2 style="margin:0;flex:1">${title}</h2><span class="seg">${['month', 'week', 'day'].map(x => `<button class="${m === x ? 'on' : ''}" data-a="mode" data-v="${x}">${cap(x)}</button>`).join('')}</span><span class="navs"><button class="ghost nb arr" data-a="nav" data-v="-1" aria-label="Previous">\u2039</button><button class="ghost nb" data-a="today">Now</button><button class="ghost nb arr" data-a="nav" data-v="1" aria-label="Next">\u203A</button></span></div>${body}`;
 }
 const errHtml = k => getSched().errs[k].map(([n, l]) => `<div>Line ${n} can't be read: ${esc(l)}</div>`).join('');
 function editor(k, title, hint, form) {
@@ -592,13 +609,13 @@ function editor(k, title, hint, form) {
   return `<section class="panel"><h2>${title}</h2><p class="tag hint">${hint} Delete a line to remove the event.</p>${form ? `<div class="addbox" data-ab="${k}"><button class="btn" type="button" data-a="addopen">+ Add</button>${form}</div>` : ''}<textarea data-k="${k}" rows="${Math.max(4, txt.split('\n').length + 1)}" spellcheck="false" aria-label="${title}">${esc(txt)}</textarea><div class="errs" id="err-${k}">${errHtml(k)}</div></section>`;
 }
 const TP = 'pattern="[0-9]{1,2}(:[0-9]{2})? ?[AaPp][Mm]" title="Time with am/pm, like 1:30pm" autocomplete="off"';
-const when = `<input type="text" class="tm" name="s" placeholder="Start (1:30pm)" required ${TP}><input type="text" class="tm" name="e" placeholder="End (Optional)" ${TP}>`;
+const when = `<input type="text" class="tm" name="s" placeholder="Start" required ${TP}><input type="text" class="tm" name="e" placeholder="End" ${TP}>`;
 const ed = (k, form) => { const m = LIST_META.find(x => x[0] === k); return editor(k, m[1], m[2], form || ''); };
 function schedP() {
-  const md = `<input type="text" class="sm" name="mo" placeholder="Month" autocapitalize="off" required><input type="number" name="da" min="1" max="31" placeholder="Day" required>`;
-  const onceF = `<form data-f="once">${md}${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form>`;
-  const recF = `<form data-f="rec"><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div>${when}<input type="text" name="t" placeholder="Description" required><button class="btn">Add</button></form>`;
-  const bdayF = `<form data-f="bday">${md}<input type="number" name="yr" min="1900" max="2100" placeholder="Year"><input type="text" name="t" placeholder="Name" required><button class="btn">Add</button></form>`;
+  const md = `<input type="text" class="sm" name="mo" placeholder="Month" autocapitalize="off" required><input type="number" class="dy" name="da" min="1" max="31" placeholder="Day" required>`;
+  const onceF = `<form data-f="once"><input type="text" class="desc" name="t" placeholder="Description" required>${md}${when}<button class="btn">Add</button></form>`;
+  const recF = `<form data-f="rec"><input type="text" class="desc" name="t" placeholder="Description" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div>${when}<button class="btn">Add</button></form>`;
+  const bdayF = `<form data-f="bday"><input type="text" class="desc" name="t" placeholder="Name" required>${md}<input type="number" class="yr" name="yr" min="1900" max="2100" placeholder="Year"><button class="btn">Add</button></form>`;
   return `<div class="panel" id="calwrap">${calHtml()}</div><div class="cols2">${ed('once', onceF)}${ed('rec', recF)}</div>${ed('bday', bdayF)}`;
 }
 
@@ -616,19 +633,20 @@ const rtRow = x => `<div class="row"><span class="time">${rtLabel(x)}</span><spa
 function tasksVis() {
   const S = getSched(), open = S.task.filter(x => !x.k || recent(x)).sort((a, b) => a.due - b.due), gen = S.gen.filter(x => !x.k || recent(x));
   const done = [...S.task.map(x => [x, 'task']), ...S.gen.map(x => [x, 'gen'])].filter(([x]) => x.k).sort((a, b) => (b[0].done || 0) - (a[0].done || 0));
-  const md = `<input type="text" class="sm" name="mo" placeholder="Month" autocapitalize="off" required><input type="number" name="da" min="1" max="31" placeholder="Day" required>`;
-  return `<div class="cols3"><div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No Dated Tasks.</div>'}<div class="addbox" data-ab="task"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="task"><input type="text" name="t" placeholder="Task (Due Date Required)" required>${md}<button class="btn">Add</button></form></div></div>
-  <div class="panel"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<div class="addbox" data-ab="gen"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="gen"><input type="text" name="t" placeholder="General Task" required><button class="btn">Add</button></form></div></div>
-  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(rtRow).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" name="t" placeholder="Recurring Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" name="dm" placeholder="Day Of Month (1, 15, Last)"><button class="btn">Add</button></form></div><p class="tag hint">Recurring tasks can't be checked off yet.</p></div></div>
+  const md = `<input type="text" class="sm" name="mo" placeholder="Month" autocapitalize="off" required><input type="number" class="dy" name="da" min="1" max="31" placeholder="Day" required>`;
+  return `<div class="cols3"><div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No Dated Tasks.</div>'}<div class="addbox" data-ab="task"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="task"><input type="text" class="desc" name="t" placeholder="Task" required>${md}<button class="btn">Add</button></form></div></div>
+  <div class="panel"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<div class="addbox" data-ab="gen"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="gen"><input type="text" name="t" placeholder="Task" required><button class="btn">Add</button></form></div></div>
+  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(rtRow).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Recurring tasks can't be checked off yet.</p></div></div>
   <div class="panel"><h2>Checked Off (${done.length})</h2>${done.map(([x, l]) => taskRow(x, l)).join('') || '<div class="empty">Nothing Checked Yet.</div>'}</div>`;
 }
 const tasksP = () => `<div id="vis">${tasksVis()}</div><div class="cols3">${ed('task')}${ed('gen')}${ed('rtask')}</div>`;
 function habitVis() {
-  const h = getSched().habit, days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
-  return `<div class="panel"><h2>Habits</h2>${h.length ? `<div class="hhead">${days.map(d => `<span>${d.toLocaleDateString(undefined, {weekday: 'narrow'})}</span>`).join('')}</div>` : ''}${h.map(x => `<div class="row"><span class="t">${esc(nice(x.name))} <span class="tag">\uD83D\uDD25${streak(x)}</span></span><span class="strip">${days.map(d => { const s = ymd(d); return `<button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button>`; }).join('')}</span><button class="x" data-a="delhab" data-v="${x.i}" aria-label="Delete">\u2715</button></div>`).join('') || '<div class="empty">No Habits Yet.</div>'}
-  <div class="addbox" data-ab="habit"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="habit"><input type="text" name="habit" placeholder="New Habit" required><button class="btn">Add</button></form></div><p class="tag hint">Placeholder tracker. Tell me what you want here.</p></div>`;
+  const c = view.hab, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i), td = todayStr();
+  const days = [...Array(7)].map((_, i) => ({k: HWD[(i + 6) % 7], d: at(i)})), h = getSched().habit;
+  return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="habnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="habnow">Now</button><button class="ghost nb arr" data-a="habnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
+  <div class="hww"><table class="hw hab"><thead><tr><th>Habit</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${h.map(x => `<tr><td class="hcn"><input class="hcin nc" data-hbn="${x.i}" value="${esc(nice(x.name))}" aria-label="Habit Name">${streak(x) ? `<div class="hstk">\uD83D\uDD25 ${streak(x)}</div>` : ''}</td>${days.map(dd => { const s = ymd(dd.d); return `<td class="hbc${s === td ? ' tdy' : ''}"><button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button></td>`; }).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hbn="new" placeholder="Add Habit" aria-label="Add Habit"></td><td colspan="7"></td></tr></tbody></table></div></div>`;
 }
-const habitP = () => `<div id="vis">${habitVis()}</div>${ed('habit')}`;
+const habitP = () => `<div id="vis">${habitVis()}</div>`;
 
 /* ---------- data page: every list lives here ---------- */
 const LIST_META = [
@@ -644,7 +662,7 @@ const LIST_META = [
   ['quote', 'Quotes', 'One quote per line, with an optional author after a dash: "The only way out is through" - Robert Frost. Type the quotation marks yourself if you want them. The dashboard shows one each day.']
 ];
 const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><label class="tgl"><input type="checkbox" data-hlp="1"${view.help ? ' checked' : ''}><span class="knob"></span><span>Show Instructions</span></label><button class="btn" data-a="backup">Download Backup</button></div><p class="tag hint">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div><div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
-const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], tasks: ['task', 'rtask', 'gen'], habit: ['habit']};
+const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], tasks: ['task', 'rtask', 'gen']};
 const errBanner = tab => { const S = getSched(), own = PAGE_LISTS[tab] || [], n = LISTS.reduce((a, k) => a + (own.includes(k) ? 0 : S.errs[k].length), 0); return n ? `<div class="panel warn">${n} line${n > 1 ? 's' : ''} can't be read. Fix ${n > 1 ? 'them' : 'it'} on the <button class="link" data-a="tab" data-v="data">Data</button> page.</div>` : ''; };
 
 /* ---------- events ---------- */
@@ -681,6 +699,8 @@ $app.addEventListener('click', e => {
   if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[done [^\]]*\]/i, ''); return '### ' + l + ' [done ' + doneStamp(u) + ']'; });
   if (a === 'hwnav') { view.hw = new Date(view.hw.getFullYear(), view.hw.getMonth(), view.hw.getDate() + 7 * +v); return render(true); }
   if (a === 'hwnow') { view.hw = new Date(); return render(true); }
+  if (a === 'habnav') { view.hab = new Date(view.hab.getFullYear(), view.hab.getMonth(), view.hab.getDate() + 7 * +v); return render(true); }
+  if (a === 'habnow') { view.hab = new Date(); return render(true); }
   if (a === 'hwtog') {
     const tg = l => /^###/.test(l) ? l.replace(/^###\s*/, '') : '### ' + l, i = +b.dataset.i;
     if (b.dataset.wk) { const [y, w] = b.dataset.wk.split(':').map(Number), ci = +b.dataset.c, dk = b.dataset.d; hwEdit(y, w, cls => { cls[ci][1][dk][i] = tg(cls[ci][1][dk][i]); }); }
@@ -745,6 +765,16 @@ $app.addEventListener('change', e => {
   const ds = e.target.dataset || {};
   if (ds.r) { view.range = +e.target.value; localStorage.setItem('dash-range', view.range); render(true); }
   else if (ds.hlp != null) { view.help = e.target.checked; localStorage.setItem('dash-help', view.help ? '1' : '0'); $app.classList.toggle('showhelp', view.help); }
+  else if (ds.hbn != null) {
+    const v = e.target.value.trim().toLowerCase().replace(/\|/g, '');
+    if (ds.hbn === 'new') { if (!v) return; addLine('habit', v + ' |'); }
+    else {
+      const i = +ds.hbn, x = pHabit((state.sched.habit.t.split('\n')[i] || '').trim());
+      if (!v) { if (x && Object.keys(x.days).length && !confirm('Delete this habit and its history?')) { render(true); return; } lineOp('habit', i, () => null); }
+      else lineOp('habit', i, l => { const y = pHabit(l.trim()); return v + ' | ' + (y ? Object.keys(y.days).sort().join(', ') : ''); });
+    }
+    changed();
+  }
   else if (ds.hc != null) {
     const v = e.target.value.trim().toLowerCase(), {y, w} = hwWk(false), cls = hwGet(y, w);
     if (ds.hc === 'new') { if (!v) return; cls.push([v, {}]); }
@@ -778,17 +808,23 @@ $app.addEventListener('pointerdown', e => {
   const g = e.target.closest('[data-grip]'), row = g && g.closest('[data-gi]'); if (!row) return;
   drag = {i: +row.dataset.gi, row, over: null}; row.classList.add('dragging'); e.preventDefault();
 });
+function dropTarget(e) {
+  const rows = [...drag.row.closest('.panel').querySelectorAll('[data-gi]')]; let best = null, bd = 1e9;
+  rows.forEach(r => { const b = r.getBoundingClientRect(), dist = Math.abs(e.clientY - (b.top + b.height / 2)); if (dist < bd) { bd = dist; best = r; } });
+  if (!best || best === drag.row) return null;
+  const b = best.getBoundingClientRect(); return {row: best, before: e.clientY < b.top + b.height / 2};
+}
 document.addEventListener('pointermove', e => {
   if (!drag) return;
-  const el = document.elementFromPoint(e.clientX, e.clientY), r = el && el.closest('[data-gi]');
-  document.querySelectorAll('.dropt').forEach(x => x.classList.remove('dropt'));
-  drag.over = r && r !== drag.row ? r : null; if (drag.over) drag.over.classList.add('dropt');
+  document.querySelectorAll('.dt-top,.dt-bot').forEach(x => x.classList.remove('dt-top', 'dt-bot'));
+  drag.drop = dropTarget(e); if (drag.drop) drag.drop.row.classList.add(drag.drop.before ? 'dt-top' : 'dt-bot');
 });
 document.addEventListener('pointerup', () => {
   if (!drag) return; const d = drag; drag = null; d.row.classList.remove('dragging');
-  document.querySelectorAll('.dropt').forEach(x => x.classList.remove('dropt'));
-  if (!d.over) return;
-  const ls = state.sched.gen.t.split('\n'), m = ls.splice(d.i, 1)[0]; ls.splice(+d.over.dataset.gi, 0, m);
+  document.querySelectorAll('.dt-top,.dt-bot').forEach(x => x.classList.remove('dt-top', 'dt-bot'));
+  if (!d.drop) return;
+  let pos = +d.drop.row.dataset.gi + (d.drop.before ? 0 : 1); if (pos > d.i) pos--;
+  const ls = state.sched.gen.t.split('\n'), m = ls.splice(d.i, 1)[0]; ls.splice(pos, 0, m);
   state.sched.gen = {t: ls.join('\n'), u: now()}; changed();
 });
 let reauth = false, lastFail = 0;
