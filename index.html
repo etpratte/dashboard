@@ -173,6 +173,7 @@ input.desc{flex:1 1 100%;width:100%}input.dm{flex:1 1 130px}
 .dt-top{box-shadow:0 -2px 0 var(--acc)}.dt-bot{box-shadow:0 2px 0 var(--acc)}
 .rlf{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.rlf input{flex:1 1 220px}
 textarea.code{font-size:12px;margin:8px 0}.steps{margin:8px 0;padding-left:20px;color:var(--mute);font-size:13px}.setup{margin-top:6px}
+.la2{display:flex;align-items:center;gap:6px;font-size:14px}.la2 input{width:70px}
 </style>
 </head>
 <body>
@@ -406,11 +407,12 @@ function pOldTodo(l) {
 }
 const COLORS = {red: ['#dc2626', '#fff'], orange: ['#ea580c', '#fff'], yellow: ['#facc15', '#1a1400'], green: ['#16a34a', '#fff'], teal: ['#0d9488', '#fff'], blue: ['#2563eb', '#fff'], purple: ['#7c3aed', '#fff'], pink: ['#ec4899', '#fff'], gray: ['#6b7280', '#fff']};
 COLORS.grey = COLORS.gray;
-function tags(l) {
-  let r = l.trim(), color = null, added = null, done = null, year = 0, bad = false, m;
+function tags(l, allowDates) {
+  let r = l.trim(), color = null, added = null, done = null, year = 0, bad = false, dates = null, m;
   while ((m = /\s*\[([^\]]*)\]$/.exec(r))) {
-    const x = m[1].trim().toLowerCase(), d = /^(added|done)\s+(.+)$/.exec(x), pd = d && pDate(d[2]);
-    if (d && pd) {
+    const x = m[1].trim().toLowerCase(), d = /^(added|done)\s+(.+)$/.exec(x), pd = d && pDate(d[2]), dm = allowDates && /^done\s+(\d{4}-\d{2}-\d{2}(?:[\s,]+\d{4}-\d{2}-\d{2})*)$/.exec(x);
+    if (dm) { dates = new Set(dm[1].split(/[\s,]+/)); }
+    else if (d && pd) {
       let ts = pd.ts; const rest = d[2].slice(pd.n).trim();
       if (rest) { const t = /^(\d{1,2})(?::(\d{2}))?\s*([ap]m)$/.exec(rest), mm = t && hm(t[1], t[2], t[3]); if (mm == null) { bad = true; break; } ts += mm * 60000; }
       if (d[1] === 'added') added = ts; else done = ts;
@@ -420,7 +422,13 @@ function tags(l) {
     else { bad = true; break; }
     r = r.slice(0, m.index).trim();
   }
-  return {rest: r, color, added, done, year, bad};
+  return {rest: r, color, added, done, year, bad, dates};
+}
+function pRT(l) { const g = tags(l, true); if (g.bad || g.color || g.added || g.done != null || g.year) return null; const r = pRec(g.rest, false, true); if (r) r.dates = g.dates || new Set(); return r; }
+function rtToggle(l, d) {
+  const g = tags(l.trim(), true), ds = new Set(g.dates || []); if (ds.has(d)) ds.delete(d); else ds.add(d);
+  const cut = ymd(new Date(now() - 60 * 864e5)), keep = [...ds].filter(x => x >= cut).sort();
+  return g.rest + (keep.length ? ' [done ' + keep.join(', ') + ']' : '');
 }
 function pTask(l) {
   let r = l.trim(), k = false; if (r.startsWith('###')) { k = true; r = r.slice(3).trim(); }
@@ -502,7 +510,7 @@ const evOnce = l => { const g = tags(l); if (g.bad) return null; const r = pOnce
 let memo = {k: '', v: null};
 function getSched() {
   const s = state.sched, k = LISTS.map(x => s[x].t).join('\u0001'); if (memo.k === k) return memo.v;
-  const out = {errs: {}}, fns = {once: evOnce, rec: ev(pRec), bday: ev(pBday), task: pTask, rtask: l => /\[[^\]]*\]\s*$/.test(l) ? null : pRec(l, false, true), gen: pGen, habit: pHabit, quote: pQuote, hw: pHw, note: l => ({t: l})};
+  const out = {errs: {}}, fns = {once: evOnce, rec: ev(pRec), bday: ev(pBday), task: pTask, rtask: pRT, gen: pGen, habit: pHabit, quote: pQuote, hw: pHw, note: l => ({t: l})};
   for (const key of LISTS) {
     out[key] = []; out.errs[key] = [];
     s[key].t.split('\n').forEach((raw, i) => {
@@ -545,7 +553,7 @@ function render(force) {
   saveDrafts();
   $app.innerHTML = `<header><div class="hd"><h1>Big Guy Life Dashboard</h1><span class="dt">${d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'})}</span></div>
   <div class="sync"><span id="sync">${statusText()}</span> ${signedIn ? '' : '<button class="btn" data-a="signin">Sign In To Sync</button>'}</div></header>
-  <nav class="tabs">${TABS.map(([k, n]) => `<button class="tab${view.tab === k ? ' on' : ''}" data-a="tab" data-v="${k}">${n}</button>`).join('')}${view.tab === 'home' ? lookSel() : ''}</nav>
+  <nav class="tabs">${TABS.map(([k, n]) => `<button class="tab${view.tab === k ? ' on' : ''}" data-a="tab" data-v="${k}">${n}</button>`).join('')}</nav>
   ${view.tab === 'data' ? '' : errBanner(view.tab)}${({home: homeP, sched: schedP, tasks: tasksP, hw: hwP, habit: habitP, data: dataP})[view.tab]()}`;
   restoreDrafts();
   $app.querySelectorAll('textarea.pad').forEach(fit);
@@ -568,14 +576,14 @@ function homeP() {
   const up = []; for (let i = 1; i <= R; i++) eventsOn(day(i), false).forEach(e => up.push([day(i), e]));
   const due = S.task.filter(x => (!x.k && x.due <= td) || recent(x)).sort((a, b) => a.due - b.due), rt = S.rtask.filter(x => rtOn(x, t)), gen = S.gen.filter(x => !x.k || recent(x));
   const apT = S.task.filter(x => !x.k && x.due > td && x.due <= end).map(x => ({ts: x.due, h: taskRow(x, 'task')}));
-  for (let i = 1; i <= R; i++) S.rtask.filter(x => rtOn(x, day(i))).forEach(x => apT.push({ts: day(i).getTime() + 1, h: `<div class="row"><span class="time">${wd(day(i))}${x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : ''}</span><span class="t">${esc(nice(x.t))}</span></div>`}));
+  for (let i = 1; i <= R; i++) S.rtask.filter(x => rtOn(x, day(i))).forEach(x => apT.push({ts: day(i).getTime() + 1, h: rtApp(x, day(i))}));
   apT.sort((a, b) => a.ts - b.ts);
   const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay(), hw = hwItems(t);
   return `<div class="dcols"><div class="dcol">
   <div class="panel o1"><h2>Today</h2>${agenda(t)}</div>
   <div class="panel o3"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd2(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div></div>
   <div class="dcol">
-  <div class="panel o2"><h2>Tasks Today</h2><h3 class="sub">HW</h3><div class="grp">${hw.map(hwRow).join('') || none('No HW Due Today.')}</div><div class="sep"></div><h3 class="sub">Tasks</h3><div class="grp">${due.map(x => taskRow(x, 'task')).join('')}${rt.map(rtRow).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div></div>
+  <div class="panel o2"><h2>Tasks Today</h2><h3 class="sub">HW</h3><div class="grp">${hw.map(hwRow).join('') || none('No HW Due Today.')}</div><div class="sep"></div><h3 class="sub">Tasks</h3><div class="grp">${due.map(x => taskRow(x, 'task', true)).join('')}${rt.map(x => rtRow(x, ymd(t))).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div></div>
   <div class="panel o4"><h2>Approaching Tasks</h2>${apT.map(x => x.h).join('') || none('Nothing Due Soon.')}</div>
   <div class="panel o5"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || none('No General Tasks.')}</div></div>
   <div class="dcol">
@@ -650,21 +658,22 @@ function schedP() {
 const addLine = (k, line) => { const cur = state.sched[k].t; state.sched[k] = {t: (cur && !/\n$/.test(cur) ? cur + '\n' : cur) + line, u: now()}; };
 const lineOp = (k, i, fn) => { const ls = state.sched[k].t.split('\n'), r = fn(ls[i]); if (r == null) ls.splice(i, 1); else ls[i] = r; state.sched[k] = {t: ls.join('\n'), u: now()}; };
 const todayStart = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime(); };
-function taskRow(x, l) {
+function taskRow(x, l, compact) {
   const late = !x.k && x.due != null && x.due < todayStart(), drag = l === 'gen' && !x.k;
-  const meta = x.k ? ['Completed' + (x.done ? ' ' + fts(x.done) : ''), x.due != null ? 'Due ' + fts(x.due) : ''].filter(Boolean).join(' \u00B7 ') : (x.due != null ? 'Due ' + fts(x.due) : '');
+  const meta = x.k ? ['Completed' + (x.done ? ' ' + fts(x.done) : ''), compact || x.due == null ? '' : 'Due ' + fts(x.due)].filter(Boolean).join(' \u00B7 ') : (x.due != null ? 'Due ' + fts(x.due) : '');
   return `<div class="row${x.k ? ' done' : ''}"${drag ? ` data-gi="${x.i}"` : ''}>${drag ? '<span class="grip" data-grip="1" aria-label="Drag To Reorder">\u2261</span>' : ''}<button class="chk" data-a="tog" data-l="${l}" data-v="${x.i}" aria-label="${x.k ? 'Uncheck' : 'Check'}"></button><span class="t">${esc(nice(x.t))}</span><span class="due${late ? ' late' : ''}">${meta}</span></div>`;
 }
 const ordS = n => n === -1 ? 'Last' : n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);
 const rtLabel = x => [x.days.size === 7 ? 'Daily' : [1, 2, 3, 4, 5, 6, 0].filter(i => x.days.has(i)).map(i => cap(DAYN[i])).join(' '), [...x.dom].sort((a, b) => a - b).map(ordS).join(' ')].filter(Boolean).join(' \u00B7 ') + (x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : '');
-const rtRow = x => `<div class="row"><span class="time">${rtLabel(x)}</span><span class="t">${esc(nice(x.t))}</span></div>`;
+const rtRow = (x, d) => { const dn = d && x.dates && x.dates.has(d); return `<div class="row${dn ? ' done' : ''}">${d ? `<button class="chk" data-a="rtog" data-v="${x.i}" data-d="${d}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button>` : ''}<span class="time">${rtLabel(x)}</span><span class="t">${esc(nice(x.t))}</span>${dn ? '<span class="due">Completed</span>' : ''}</div>`; };
+const rtApp = (x, d) => { const ds = ymd(d), dn = x.dates && x.dates.has(ds); return `<div class="row${dn ? ' done' : ''}"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button><span class="time">${wd(d)}${x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : ''}</span><span class="t">${esc(nice(x.t))}</span>${dn ? '<span class="due">Completed</span>' : ''}</div>`; };
 function tasksVis() {
   const S = getSched(), open = S.task.filter(x => !x.k || recent(x)).sort((a, b) => a.due - b.due), gen = S.gen.filter(x => !x.k || recent(x));
   const done = [...S.task.map(x => [x, 'task']), ...S.gen.map(x => [x, 'gen'])].filter(([x]) => x.k).sort((a, b) => (b[0].done || 0) - (a[0].done || 0));
   const md = `<input type="text" class="sm" name="mo" placeholder="Month" autocapitalize="off" required><input type="number" class="dy" name="da" min="1" max="31" placeholder="Day" required>`;
   return `<div class="cols3"><div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No Dated Tasks.</div>'}<div class="addbox" data-ab="task"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="task"><input type="text" class="desc" name="t" placeholder="Task" required>${md}<button class="btn">Add</button></form></div></div>
   <div class="panel"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<div class="addbox" data-ab="gen"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="gen"><input type="text" name="t" placeholder="Task" required><button class="btn">Add</button></form></div></div>
-  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(rtRow).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Recurring tasks can't be checked off yet.</p></div></div>
+  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(x => rtRow(x, rtOn(x, new Date()) ? todayStr() : '')).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Check the circle to complete that day's instance.</p></div></div>
   <div class="panel"><h2>Checked Off (${done.length})</h2>${done.map(([x, l]) => taskRow(x, l)).join('') || '<div class="empty">Nothing Checked Yet.</div>'}</div>`;
 }
 const tasksP = () => `<div id="vis">${tasksVis()}</div><div class="cols3">${ed('task')}${ed('gen')}${ed('rtask')}</div>`;
@@ -683,7 +692,7 @@ const LIST_META = [
   ['bday', 'Birthdays', 'Format: mar 5 1990 name. The year is optional and shows an age. Color tag optional, like [purple].'],
   ['task', 'Tasks', 'One per line: oct 20 buy milk. A due date is required. When you finish editing, [2026], [added ...] and (on checked lines) [done ...] tags are added for you and come back if removed. Start a line with ### to check it off.'],
   ['gen', 'General Tasks', 'One per line, no date needed: buy milk. [added ...] and [done ...] tags are added for you. Start a line with ### to check it off. Drag the handle on the Tasks page or dashboard to reorder.'],
-  ['rtask', 'Recurring Tasks', `One per line: mwf take vitamins, or 1st,15th pay rent for days of the month (last works too). They can't be checked off yet.`],
+  ['rtask', 'Recurring Tasks', `One per line: mwf take vitamins, or 1st,15th pay rent for days of the month (last works too). Check them off on the Tasks page or dashboard; each completion is saved on the line as a [done 2026-10-14] tag.`],
   ['hw', 'HW', 'One line per week: year:week:data, like 2026:42:[["math",{"mon":["ch 3 hw"],"wed":["### quiz"]}]]. Weeks run Monday to Sunday. The HW page edits these lines; ### marks an assignment done.'],
   ['habit', 'Habits', 'One habit per line with the days you did it: meditate | 2026-10-12, 2026-10-13.'],
   ['note', 'Notepad', 'Free text. The notepad on the dashboard edits this same box.'],
@@ -714,7 +723,7 @@ function relayPanel() {
   <details class="setup"><summary class="ghost">Setup Steps</summary><ol class="steps"><li>Go to script.google.com and click New project.</li><li>Delete what is there, paste the code below, and save.</li><li>Click Deploy, then New deployment, then the gear and Web app. Set Execute as: Me and Who has access: Anyone, then Deploy.</li><li>Click Authorize access, choose your account, and continue past the unverified screen (Advanced, then Go to project).</li><li>Copy the Web app URL, paste it below with the key, and press Connect.</li></ol><textarea class="code" readonly rows="9">${esc(gsCode(k))}</textarea><button class="btn" data-a="relaycode">Copy Code</button></details>
   <div class="rlf"><input type="text" id="rl-url" placeholder="Web App URL" autocomplete="off"><input type="text" id="rl-key" value="${k}" placeholder="Key" autocomplete="off"><button class="btn" data-a="relayconnect">Connect</button></div></div>`;
 }
-const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><label class="tgl"><input type="checkbox" data-hlp="1"${view.help ? ' checked' : ''}><span class="knob"></span><span>Show Instructions</span></label><button class="btn" data-a="backup">Download Backup</button></div><p class="tag hint">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${relayPanel()}<div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
+const dataP = () => `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">All Data</h2><label class="tgl"><input type="checkbox" data-hlp="1"${view.help ? ' checked' : ''}><span class="knob"></span><span>Show Instructions</span></label><label class="la2"><span>Look Ahead</span><input type="number" min="1" max="365" value="${view.range}" data-la="1" aria-label="Look Ahead Days"><span>Days</span></label><button class="btn" data-a="backup">Download Backup</button></div><p class="tag hint">Every list lives here and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${relayPanel()}<div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
 const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], tasks: ['task', 'rtask', 'gen']};
 const errBanner = tab => { const S = getSched(), own = PAGE_LISTS[tab] || [], n = LISTS.reduce((a, k) => a + (own.includes(k) ? 0 : S.errs[k].length), 0); return n ? `<div class="panel warn">${n} line${n > 1 ? 's' : ''} can't be read. Fix ${n > 1 ? 'them' : 'it'} on the <button class="link" data-a="tab" data-v="data">Data</button> page.</div>` : ''; };
 
@@ -753,6 +762,7 @@ $app.addEventListener('click', e => {
   if (a === 'today') { view.cur = new Date(); return reCal(); }
   if (a === 'nav') { const k = +v; view.cur = view.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + k, 1) : new Date(c.getFullYear(), c.getMonth(), c.getDate() + k * (view.mode === 'week' ? 7 : 1)); return reCal(); }
   if (a === 'goday') { view.cur = new Date(v + 'T00:00'); view.mode = 'day'; return reCal(); }
+  if (a === 'rtog') lineOp('rtask', +v, l => rtToggle(l, b.dataset.d));
   if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[done [^\]]*\]/i, ''); return '### ' + l + ' [done ' + doneStamp(u) + ']'; });
   if (a === 'hwnav') { view.hw = new Date(view.hw.getFullYear(), view.hw.getMonth(), view.hw.getDate() + 7 * +v); return render(true); }
   if (a === 'hwnow') { view.hw = new Date(); return render(true); }
@@ -788,8 +798,8 @@ function mkLine(k, d) {
     if (!parts.length) { toast('Pick at least one day'); return; }
     p = parts.join(' ');
   } else if (k !== 'gen') {
-    const mi = MON.indexOf((d.get('mo') || '').trim().slice(0, 3).toLowerCase()), da = +d.get('da');
-    if (mi < 0 || !dateOk(2024, mi, da)) { toast('Month needs 3 letters (like Mar) and a valid day'); return; }
+    const mo0 = (d.get('mo') || '').trim(), mi = /^\d{1,2}$/.test(mo0) ? +mo0 - 1 : MON.indexOf(mo0.slice(0, 3).toLowerCase()), da = +d.get('da');
+    if (mi < 0 || !dateOk(2024, mi, da)) { toast('Enter A Month (Like Mar Or 3) And A Valid Day'); return; }
     let y = +d.get('yr') || 0;
     if (k === 'once' || k === 'task') { const n = new Date(), yy = n.getFullYear(); y = new Date(yy, mi, da) < new Date(yy, n.getMonth(), n.getDate()) ? yy + 1 : yy; }
     if (k === 'task' || k === 'once') { ytag = y; y = 0; }
@@ -821,6 +831,7 @@ $app.addEventListener('input', e => {
 $app.addEventListener('change', e => {
   const ds = e.target.dataset || {};
   if (ds.r) { view.range = +e.target.value; localStorage.setItem('dash-range', view.range); render(true); }
+  else if (ds.la != null) { const n = Math.max(1, Math.min(365, Math.round(+e.target.value) || 14)); view.range = n; e.target.value = n; localStorage.setItem('dash-range', n); }
   else if (ds.hlp != null) { view.help = e.target.checked; localStorage.setItem('dash-help', view.help ? '1' : '0'); $app.classList.toggle('showhelp', view.help); }
   else if (ds.hbn != null) {
     const v = e.target.value.trim().toLowerCase().replace(/\|/g, '');
