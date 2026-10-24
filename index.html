@@ -450,7 +450,7 @@ function tags(l, allowDates) {
 }
 function pRT(l) { const g = tags(l, true); if (g.bad || !g.cat || g.color || g.added || g.done != null || g.year) return null; const r = pRec(g.rest, false, true); if (r) { r.cat = g.cat; r.dates = g.dates || new Set(); r.legacy = !!(g.dates || g.since); } return r; }
 const cleanL = l => l.replace(/^###\s*/, '').trim().toLowerCase();
-const hwPut = (y, w, fn) => { const cls = hwGet(y, w); fn(cls); hwWrite(y, w, cls); };
+const hwPut = (y, w, fn, keep) => { const cls = hwGet(y, w); fn(cls); hwWrite(y, w, cls, keep); };
 const hasRec = (d, x) => hwItems(d).some(it => it.n.toLowerCase() === x.cat && cleanL(it.l) === x.t.toLowerCase());
 const rtDone = (x, ds) => hwItems(new Date(ds + 'T00:00')).some(it => it.n.toLowerCase() === x.cat && cleanL(it.l) === x.t.toLowerCase() && /^###/.test(it.l));
 const rtVirt = d => getSched().rtask.filter(x => rtOn(x, d) && !hasRec(d, x));
@@ -465,11 +465,13 @@ function hwRec(d, x, done) {
 function rtTog(i, ds) {
   const x = getSched().rtask.find(r => r.i === i), d = new Date(ds + 'T00:00'); if (!x || isNaN(d)) return;
   const {y, w} = isoWeek(d), dk = HWD[(d.getDay() + 6) % 7];
+  let nowDone = false;
   hwPut(y, w, cls => {
     let c = cls.find(q => q[0].toLowerCase() === x.cat); if (!c) { c = [x.cat, {}]; cls.push(c); }
     const a = c[1][dk] = c[1][dk] || [], j = a.findIndex(l => cleanL(l) === x.t.toLowerCase());
-    if (j < 0) a.push('### ' + x.t); else a[j] = /^###/.test(a[j]) ? a[j].replace(/^###\s*/, '') : '### ' + a[j];
+    if (j < 0) { a.push('### ' + x.t); nowDone = true; } else if (/^###/.test(a[j])) a[j] = a[j].replace(/^###\s*/, ''); else { a[j] = '### ' + a[j]; nowDone = true; }
   });
+  if (nowDone) lingerSet(lingerKey(y, w, x.cat, dk, x.t));
   changed();
 }
 function stampRecurring() {
@@ -489,12 +491,12 @@ function stampRecurring() {
     for (; d <= yd; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) R.forEach(x => { if (rtOn(x, d) && !hasRec(d, x)) hwRec(d, x, false); });
     state.rtdone = yst; ch = true;
   }
-  const g0 = state.sched.gen.t, g1 = g0.replace(/\[done (?=\d{1,2}\/)/gi, '[completed ').replace(/\[(added|completed) (\d{1,2}\/\d{1,2}\/)(\d{2})(?=[\s\]])/gi, (m, k, md, yy) => '[' + k + ' ' + md + '20' + yy);
+  const g0 = state.sched.gen.t, g1 = g0.replace(/\[done (?=\d{1,2}\/)/gi, '[completed ').replace(/(\[completed \d{1,2}\/\d{1,2}\/\d{2,4})\s+\d{1,2}(?::\d{2})?\s*[ap]m\]/gi, '$1]').replace(/\[(added|completed) (\d{1,2}\/\d{1,2}\/)(\d{2})(?=[\s\]])/gi, (m, k, md, yy) => '[' + k + ' ' + md + '20' + yy);
   if (g1 !== g0) { state.sched.gen = {t: g1, u: now()}; ch = true; }
   if (ch) cache();
   return ch;
 }
-const doneStamp = u => { const d = new Date(u); return lineD(u) + ' ' + ft(d.getHours() * 60 + d.getMinutes()); };
+const doneStamp = u => lineD(u);
 function fixLines(key, text) {
   const yr = new Date().getFullYear(), st = lineD(now()), ds = doneStamp(now());
   return text.split('\n').map(raw => {
@@ -545,8 +547,8 @@ function hwBase(y, w) {
   const prev = S.filter(e => K(e) < key).sort((a, b) => K(a) - K(b)).pop() || S.filter(e => K(e) > key).sort((a, b) => K(a) - K(b))[0];
   return prev ? prev.cls.map(([n]) => [n, {}]) : [];
 }
-function hwWrite(y, w, cls) {
-  const key = y * 100 + w, line = cls.length ? y + ':' + pad(w) + ':' + JSON.stringify(cls) : null, ls = state.sched.hw.t ? state.sched.hw.t.split('\n') : [];
+function hwWrite(y, w, cls, keep) {
+  const key = y * 100 + w, line = cls.length || keep ? y + ':' + pad(w) + ':' + JSON.stringify(cls) : null, ls = state.sched.hw.t ? state.sched.hw.t.split('\n') : [];
   const K = x => { const m = /^\s*(\d{4}):(\d{1,2}):/.exec(x); return m ? +m[1] * 100 + +m[2] : null; };
   const i = ls.findIndex(x => K(x) === key);
   if (i >= 0) { if (line) ls[i] = line; else ls.splice(i, 1); }
@@ -570,8 +572,28 @@ function hwMod(ci, k, pv, fn, quiet) {
 const ev = f => l => { const g = tags(l); if (g.bad || g.year) return null; const r = f(g.rest); if (r) r.color = g.color; return r; };
 const evOnce = l => { const g = tags(l); if (g.bad) return null; const r = pOnce(g.rest, g.year); if (r) r.color = g.color; return r; };
 let memo = {k: '', v: null};
+const hwCatName = ci => { const x = hwWk(false), c = hwGet(x.y, x.w)[ci]; return c ? c[0] : ''; };
+function catBlock(i, name, y, w) {
+  const n = name.toLowerCase(), key = y * 100 + w, cur = hwGet(y, w)[i];
+  if (getSched().rtask.some(r => r.cat === n)) return 'Remove its recurring tasks first';
+  const used = o => Object.keys(o || {}).some(k => (o[k] || []).length);
+  if (hwCellItems(i, 'sun', true).length || (cur && used(cur[1]))) return 'Clear every task in that row first';
+  if (getSched().hw.some(e => e.y * 100 + e.w > key && e.cls.some(c => c[0].toLowerCase() === n && used(c[1])))) return 'That row still has tasks in a later week';
+  return '';
+}
+function hwCatDelete(y, w, name) {
+  const n = name.toLowerCase(), key = y * 100 + w;
+  hwPut(y, w, cls => { const j = cls.findIndex(c => c[0].toLowerCase() === n); if (j >= 0) cls.splice(j, 1); }, true);
+  const ls = state.sched.hw.t.split('\n').map(raw => {
+    const x = pHw(raw.trim()); if (!x || x.y * 100 + x.w <= key) return raw;
+    const cls = x.cls.filter(c => c[0].toLowerCase() !== n);
+    return cls.length ? x.y + ':' + pad(x.w) + ':' + JSON.stringify(cls) : null;
+  }).filter(l => l != null);
+  state.sched.hw = {t: ls.join('\n'), u: now()};
+}
+const wkNow = () => { const x = isoWeek(new Date()); return x.y * 100 + x.w; };
 function getSched() {
-  const s = state.sched, k = LISTS.map(x => s[x].t).join('\u0001'); if (memo.k === k) return memo.v;
+  const s = state.sched, k = LISTS.map(x => s[x].t).join('\u0001') + '|' + wkNow(); if (memo.k === k) return memo.v;
   const out = {errs: {}}, fns = {once: evOnce, rec: ev(pRec), bday: ev(pBday), rtask: pRT, gen: pGen, habit: pHabit, quote: pQuote, hw: pHw, note: l => ({t: l})};
   for (const key of LISTS) {
     out[key] = []; out.errs[key] = [];
@@ -580,7 +602,8 @@ function getSched() {
       const r = fns[key](l); if (r) { r.i = i; out[key].push(r); } else out.errs[key].push([i + 1, l]);
     });
   }
-  const cats = new Set(); out.hw.forEach(e => e.cls.forEach(c => cats.add(c[0].toLowerCase()))); out.cats = cats;
+  const ck = wkNow(), K = e => e.y * 100 + e.w, cats = new Set(), base = out.hw.filter(e => K(e) <= ck).sort((a, b) => K(a) - K(b)).pop();
+  [base, ...out.hw.filter(e => K(e) >= ck)].filter(Boolean).forEach(e => e.cls.forEach(c => cats.add(c[0].toLowerCase()))); out.cats = cats;
   out.rtask = out.rtask.filter(r => { if (cats.has(r.cat)) return true; out.errs.rtask.push([r.i + 1, s.rtask.t.split('\n')[r.i].trim()]); return false; });
   out.errs.rtask.sort((a, b) => a[0] - b[0]);
   memo = {k, v: out}; return out;
@@ -627,7 +650,13 @@ function render(force) {
   if (view.rf) { const el = $app.querySelector(`[name="${view.rf}"]`); view.rf = null; if (el) el.focus(); }
 }
 
-const recent = x => x.k && x.done && now() - x.done < 864e5;
+const LKEY = 'dash-linger';
+const lingerMap = () => { try { return JSON.parse(localStorage.getItem(LKEY)) || {}; } catch (e) { return {}; } };
+const lingerSet = key => { const m = lingerMap(), n = now(); Object.keys(m).forEach(k => { if (n - m[k] > 864e5) delete m[k]; }); m[key] = n; try { localStorage.setItem(LKEY, JSON.stringify(m)); } catch (e) {} };
+const lingers = key => { const v = lingerMap()[key]; return !!v && now() - v < 864e5; };
+const lingerKey = (y, w, cat, dk, text) => y + ':' + w + ':' + String(cat).toLowerCase() + ':' + dk + ':' + cleanL(text);
+const itemKey = x => x.wk + ':' + String(x.n).toLowerCase() + ':' + x.dk + ':' + cleanL(x.l);
+const recent = x => x.k && x.done && (x.done >= todayStart() || lingers('g:' + x.t.toLowerCase()));
 const wd2 = d => d.toLocaleDateString(undefined, {weekday: 'short'}) + ' ' + d.getDate();
 const wd = d => d.toLocaleDateString(undefined, {weekday: 'short'}) + ' ' + fmtD(d);
 function hwItems(t) {
@@ -643,7 +672,7 @@ function homeP() {
   const gen = S.gen.filter(x => !x.k || recent(x)), rt = rtVirt(t), hw = hwItems(t), apT = [];
   for (let i = 1; i <= R; i++) {
     const d = day(i);
-    hwItems(d).filter(x => !/^###/.test(x.l)).forEach(x => apT.push({ts: d.getTime(), h: hwRow(x, d)}));
+    hwItems(d).filter(x => !/^###/.test(x.l) || lingers(itemKey(x))).forEach(x => apT.push({ts: d.getTime(), h: hwRow(x, d)}));
     rtVirt(d).forEach(x => apT.push({ts: d.getTime() + 1, h: rtApp(x, d)}));
   }
   const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay();
@@ -672,7 +701,7 @@ function hwSheet() {
   const days = [{k: 'sun', d: at(0), pv: true}, ...HWD.slice(0, 6).map((k, i) => ({k, d: at(i + 1), pv: false}))];
   return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="hwnow">Now</button><button class="ghost nb arr" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
   <div class="hww"><table class="hw"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwCell(ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
-  <p class="tag hint">Click a cell to type tasks, one per line. Click a circle to mark one done. Edit a category name in the first column; clear it to remove the category. Recurring tasks appear in light blue inside their category and are edited in the Recurring Tasks list below.</p></div>`;
+  <p class="tag hint">Click a cell to type tasks, one per line. Click a circle to mark one done. Edit a category name in the first column; clear it to remove the category from this week onward (only when its row is empty). Recurring tasks appear in light blue inside their category and are edited in the Recurring Tasks list below.</p></div>`;
 }
 
 const PX = 44;
@@ -758,7 +787,7 @@ const LIST_META = [
   ['once', 'Unique Events', 'Format: mar 5 2026 5pm-6pm description [green]. A start time with am/pm is required; color is optional. When you finish editing, the year is added as a tag like [2026] (it comes back if removed). Unique events are yellow unless you add a color.'],
   ['rec', 'Recurring Events', 'Format: mwf 5pm-6pm description. Days: mwf, tth, su, sa, mon,wed, daily, weekdays, weekends. Times need am/pm: 5pm-6pm, 5-5:30pm, 9am-3. Color tag optional, like [green].'],
   ['bday', 'Birthdays', 'Format: mar 5 1990 name. The year is optional and shows an age. Color tag optional, like [purple].'],
-  ['gen', 'General Tasks', 'One per line, no date needed: buy milk. [added 10/15/2026] and [completed 10/15/2026 3:05pm] tags are added for you. Start a line with ### to check it off. Drag the handle on the Tasks page or dashboard to reorder.'],
+  ['gen', 'General Tasks', 'One per line, no date needed: buy milk. [added 10/15/2026] and [completed 10/15/2026] tags are added for you. Start a line with ### to check it off. Drag the handle on the Tasks page or dashboard to reorder.'],
   ['rtask', 'Recurring Tasks', 'One per line, with a category tag at the end: mwf take vitamins [mech], or 1st,15th pay rent [home] for days of the month (last works too). The category must already exist on the Tasks sheet or the line shows an error. Check tasks off on the Tasks page or dashboard: a checked task is added to its category on the Tasks sheet as done, and a day that passes unchecked is recorded there too.'],
   ['hw', 'Tasks', 'One line per week: year:week:data, like 2026:42:[["math",{"mon":["ch 3 hw"],"wed":["### quiz"]}]]. Weeks run Monday to Sunday. The Tasks page edits these lines; ### marks a task done.'],
   ['habit', 'Habits', 'One habit per line with the days you did it: meditate | 2026-10-12, 2026-10-13.'],
@@ -834,20 +863,20 @@ $app.addEventListener('click', e => {
   if (a === 'nav') { const k = +v; view.cur = view.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + k, 1) : new Date(c.getFullYear(), c.getMonth(), c.getDate() + k * (view.mode === 'week' ? 7 : 1)); return reCal(); }
   if (a === 'goday') { view.cur = new Date(v + 'T00:00'); view.mode = 'day'; return reCal(); }
   if (a === 'rtog') return rtTog(+v, b.dataset.d);
-  if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[(?:done|completed) [^\]]*\]/i, ''); return '### ' + l + ' [completed ' + doneStamp(u) + ']'; });
+  if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (!/^###/.test(l)) { const g = pGen(l); if (g) lingerSet('g:' + g.t.toLowerCase()); } if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[(?:done|completed) [^\]]*\]/i, ''); return '### ' + l + ' [completed ' + doneStamp(u) + ']'; });
   if (a === 'hwnav') { view.hw = new Date(view.hw.getFullYear(), view.hw.getMonth(), view.hw.getDate() + 7 * +v); return render(true); }
   if (a === 'hwnow') { view.hw = new Date(); return render(true); }
   if (a === 'habnav') { view.hab = new Date(view.hab.getFullYear(), view.hab.getMonth(), view.hab.getDate() + 7 * +v); return render(true); }
   if (a === 'habnow') { view.hab = new Date(); return render(true); }
   if (a === 'hwtog') {
     const tg = l => /^###/.test(l) ? l.replace(/^###\s*/, '') : '### ' + l, i = +b.dataset.i;
-    if (b.dataset.wk) { const [y, w] = b.dataset.wk.split(':').map(Number), ci = +b.dataset.c, dk = b.dataset.d; hwEdit(y, w, cls => { cls[ci][1][dk][i] = tg(cls[ci][1][dk][i]); }); }
-    else { hwMod(+b.dataset.c, b.dataset.d, b.dataset.pv === '1', it => it.map((l, j) => j === i ? tg(l) : l), true); b.classList.toggle('on'); const r = b.closest('.hl'); if (r) r.classList.toggle('hd'); }
+    if (b.dataset.wk) { const [y, w] = b.dataset.wk.split(':').map(Number), ci = +b.dataset.c, dk = b.dataset.d; hwEdit(y, w, cls => { const l0 = cls[ci][1][dk][i]; if (!/^###/.test(l0)) lingerSet(lingerKey(y, w, cls[ci][0], dk, l0)); cls[ci][1][dk][i] = tg(l0); }); }
+    else { const pw = hwWk(b.dataset.pv === '1'), cat0 = hwCatName(+b.dataset.c); hwMod(+b.dataset.c, b.dataset.d, b.dataset.pv === '1', it => it.map((l, j) => { if (j === i && !/^###/.test(l)) lingerSet(lingerKey(pw.y, pw.w, cat0, b.dataset.d, l)); return j === i ? tg(l) : l; }), true); b.classList.toggle('on'); const r = b.closest('.hl'); if (r) r.classList.toggle('hd'); }
     return;
   }
   if (a === 'hwedit') {
     if (e.target.tagName === 'TEXTAREA') return;
-    const ci = +b.dataset.c, k = b.dataset.d, pv = b.dataset.pv === '1', lines = hwCellItems(ci, k, pv);
+    const ci = +b.dataset.c, k = b.dataset.d, pv = b.dataset.pv === '1', cat = hwCatName(ci), lines = hwCellItems(ci, k, pv).filter(l => !recOf(cat, l));
     b.innerHTML = `<textarea class="hwt" data-hw="1" data-c="${ci}" data-d="${k}" data-pv="${pv ? 1 : 0}" rows="${Math.max(3, lines.length + 1)}">${esc(lines.join('\n'))}</textarea>`;
     const ta = b.querySelector('textarea'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); return;
   }
@@ -918,7 +947,7 @@ $app.addEventListener('change', e => {
   else if (ds.hc != null) {
     const v = e.target.value.trim().toLowerCase(), {y, w} = hwWk(false), cls = hwGet(y, w);
     if (ds.hc === 'new') { if (!v) return; cls.push([v, {}]); }
-    else { const i = +ds.hc; if (!v) { if (Object.keys(cls[i][1]).length && !confirm('Delete this category and its tasks for this week?')) { render(true); return; } cls.splice(i, 1); } else cls[i][0] = v; }
+    else { const i = +ds.hc; if (!v) { const why = catBlock(i, cls[i][0], y, w); if (why) { toast(why); render(true); return; } hwCatDelete(y, w, cls[i][0]); changed(); return; } else cls[i][0] = v; }
     hwWrite(y, w, cls); changed();
   }
 });
@@ -930,8 +959,9 @@ $app.addEventListener('focusout', e => {
     t.value = nt; state.sched[ds.k] = {t: nt, u: now()}; changed(true);
     const x = document.getElementById('err-' + ds.k); if (x) x.innerHTML = errHtml(ds.k);
   } else if (ds.hw) {
-    const ci = +ds.c, k = ds.d, pv = ds.pv === '1', lines = t.value.split('\n').map(x => x.trim()).filter(Boolean);
-    if (JSON.stringify(lines) !== JSON.stringify(hwCellItems(ci, k, pv))) hwMod(ci, k, pv, () => lines, true);
+    const ci = +ds.c, k = ds.d, pv = ds.pv === '1', cat = hwCatName(ci), orig = hwCellItems(ci, k, pv), rest = t.value.split('\n').map(x => x.trim()).filter(Boolean);
+    const lines = orig.map(l => recOf(cat, l) ? l : (rest.length ? rest.shift() : null)).filter(l => l != null).concat(rest);
+    if (JSON.stringify(lines) !== JSON.stringify(orig)) hwMod(ci, k, pv, () => lines, true);
     t.parentNode.innerHTML = hwCell(ci, k, pv);
   }
 });
