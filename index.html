@@ -186,10 +186,9 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .hl,.hl.hd{font-weight:400}
 .hl .chk.on{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.8 5.3 4 7.5 8.3 2.6' fill='none' stroke='%2312171d' stroke-width='1.7'/%3E%3C/svg%3E");background-size:10px 10px;background-position:center;background-repeat:no-repeat}
 .hl .chk.on::after{content:none}
-.rmk{color:var(--acc);margin-right:5px;font-weight:700}
-.hl.rec{border-left:2px solid var(--acc);background:rgba(122,169,255,.08)}.hl.rec.hd{background:var(--oksoft);border-left-color:var(--ok)}
-.hw tr.recrow td{background:rgba(122,169,255,.04)}.rcl{display:block;padding:4px;font-weight:600;color:var(--acc)}.hc.rc{cursor:default}
-.row.rec{border-left:2px solid var(--acc);padding-left:8px}
+:root{--lb:#7dd3fc}
+.hl.rec:not(.hd){color:var(--lb)}
+.row.rec:not(.done):not(.hwd) .t{color:var(--lb)}
 </style>
 </head>
 <body>
@@ -232,7 +231,7 @@ function mergeArr(a = [], b = [], nested) {
   if (nested) m.forEach((v, k) => { const o1 = a.find(z => z.id === k), o2 = b.find(z => z.id === k); v.items = mergeArr(o1 && o1.items, o2 && o2.items); });
   return [...m.values()];
 }
-const merge = (a, b) => { a = norm({...a}); b = norm({...b}); const sched = {}; LISTS.forEach(k => { sched[k] = pick(a.sched[k], b.sched[k]); }); return norm({...b, ...a, sched}); };
+const merge = (a, b) => { a = norm({...a}); b = norm({...b}); const sched = {}; LISTS.forEach(k => { sched[k] = pick(a.sched[k], b.sched[k]); }); const rd = [a.rtdone, b.rtdone].filter(Boolean).sort().pop(); return norm({...b, ...a, sched, ...(rd ? {rtdone: rd} : {})}); };
 
 /* ---------- Google auth + Drive ---------- */
 function relay() { try { const r = JSON.parse(localStorage.getItem('dash-relay')); return r && r.url && r.key ? r : null; } catch (e) { return null; } }
@@ -335,7 +334,7 @@ const fmtL = d => d.toLocaleDateString(undefined, {weekday: 'long', month: 'shor
 const fts = ts => { const d = new Date(ts); return fmtD(d, d.getFullYear() !== new Date().getFullYear()); };
 const ft = n => { const h = Math.floor(n / 60), m = n % 60; return ((h + 11) % 12 + 1) + (m ? ':' + pad(m) : '') + (h < 12 ? 'am' : 'pm'); };
 const LISTS = ['once', 'rec', 'bday', 'rtask', 'gen', 'habit', 'quote', 'hw', 'note'];
-const lineD = ts => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2); };
+const lineD = ts => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); };
 const oldToNew = l => { const x = pOldTodo(l.trim()); if (!x) return l; return (x.k ? '### ' : '') + x.t + (x.c ? ' [added ' + lineD(x.c) + ']' : '') + (x.kd ? ' [done ' + lineD(x.kd) + ']' : ''); };
 function norm(s) {
   s.sched = s.sched || {};
@@ -431,10 +430,9 @@ function pOldTodo(l) {
 const COLORS = {red: ['#dc2626', '#fff'], orange: ['#ea580c', '#fff'], yellow: ['#facc15', '#1a1400'], green: ['#16a34a', '#fff'], teal: ['#0d9488', '#fff'], blue: ['#2563eb', '#fff'], purple: ['#7c3aed', '#fff'], pink: ['#ec4899', '#fff'], gray: ['#6b7280', '#fff']};
 COLORS.grey = COLORS.gray;
 const toIso = t => { let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t); if (m) return t; m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(t); if (!m) return null; const y = m[3].length === 2 ? 2000 + +m[3] : +m[3]; return y + '-' + pad(+m[1]) + '-' + pad(+m[2]); };
-const toShort = k => { const [y, m, d] = k.split('-').map(Number); return m + '/' + d + '/' + String(y).slice(2); };
 const DL = /^(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:[\s,]+(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}))*$/;
 function tags(l, allowDates) {
-  let r = l.trim(), color = null, added = null, done = null, year = 0, bad = false, dates = null, since = null, m;
+  let r = l.trim(), color = null, added = null, done = null, year = 0, bad = false, dates = null, since = null, cat = null, m;
   while ((m = /\s*\[([^\]]*)\]$/.exec(r))) {
     const x = m[1].trim().toLowerCase(), d = /^(added|done)\s+(.+)$/.exec(x), pd = d && pDate(d[2]), rt = allowDates && /^(done|missed|since)\s+(.+)$/.exec(x);
     if (rt && DL.test(rt[2])) { const set = new Set(rt[2].split(/[\s,]+/).map(toIso)); if (rt[1] === 'done') dates = set; else if (rt[1] === 'since') since = [...set][0]; }
@@ -443,28 +441,58 @@ function tags(l, allowDates) {
       if (rest) { const t = /^(\d{1,2})(?::(\d{2}))?\s*([ap]m)$/.exec(rest), mm = t && hm(t[1], t[2], t[3]); if (mm == null) { bad = true; break; } ts += mm * 60000; }
       if (d[1] === 'added') added = ts; else done = ts;
     }
+    else if (allowDates && x) { if (cat) { bad = true; break; } cat = x; }
     else if (/^\d{4}$/.test(x)) year = +x;
     else if (Object.prototype.hasOwnProperty.call(COLORS, x)) color = x;
     else { bad = true; break; }
     r = r.slice(0, m.index).trim();
   }
-  return {rest: r, color, added, done, year, bad, dates, since};
+  return {rest: r, color, added, done, year, bad, dates, since, cat};
 }
-function pRT(l) { const g = tags(l, true); if (g.bad || g.color || g.added || g.done != null || g.year) return null; const r = pRec(g.rest, false, true); if (r) { r.dates = g.dates || new Set(); r.since = g.since; } return r; }
-const rtBuild = (rest, since, done) => rest + (since ? ' [since ' + toShort(since) + ']' : '') + (done.size ? ' [done ' + [...done].sort().map(toShort).join(', ') + ']' : '');
-function rtToggle(l, d) {
-  const g = tags(l.trim(), true), done = new Set(g.dates || []);
-  if (done.has(d)) done.delete(d); else done.add(d);
-  return rtBuild(g.rest, g.since || todayStr(), done);
+function pRT(l) { const g = tags(l, true); if (g.bad || !g.cat || g.color || g.added || g.done != null || g.year) return null; const r = pRec(g.rest, false, true); if (r) { r.cat = g.cat; r.dates = g.dates || new Set(); r.legacy = !!(g.dates || g.since); } return r; }
+const cleanL = l => l.replace(/^###\s*/, '').trim().toLowerCase();
+const hwPut = (y, w, fn) => { const cls = hwGet(y, w); fn(cls); hwWrite(y, w, cls); };
+const hasRec = (d, x) => hwItems(d).some(it => it.n.toLowerCase() === x.cat && cleanL(it.l) === x.t.toLowerCase());
+const rtDone = (x, ds) => hwItems(new Date(ds + 'T00:00')).some(it => it.n.toLowerCase() === x.cat && cleanL(it.l) === x.t.toLowerCase() && /^###/.test(it.l));
+const rtVirt = d => getSched().rtask.filter(x => rtOn(x, d) && !hasRec(d, x));
+const recOf = (cat, l) => getSched().rtask.some(r => r.cat === String(cat).toLowerCase() && r.t.toLowerCase() === cleanL(l));
+function hwRec(d, x, done) {
+  const {y, w} = isoWeek(d), dk = HWD[(d.getDay() + 6) % 7];
+  hwPut(y, w, cls => {
+    let c = cls.find(q => q[0].toLowerCase() === x.cat); if (!c) { c = [x.cat, {}]; cls.push(c); }
+    (c[1][dk] = c[1][dk] || []).push((done ? '### ' : '') + x.t);
+  });
+}
+function rtTog(i, ds) {
+  const x = getSched().rtask.find(r => r.i === i), d = new Date(ds + 'T00:00'); if (!x || isNaN(d)) return;
+  const {y, w} = isoWeek(d), dk = HWD[(d.getDay() + 6) % 7];
+  hwPut(y, w, cls => {
+    let c = cls.find(q => q[0].toLowerCase() === x.cat); if (!c) { c = [x.cat, {}]; cls.push(c); }
+    const a = c[1][dk] = c[1][dk] || [], j = a.findIndex(l => cleanL(l) === x.t.toLowerCase());
+    if (j < 0) a.push('### ' + x.t); else a[j] = /^###/.test(a[j]) ? a[j].replace(/^###\s*/, '') : '### ' + a[j];
+  });
+  changed();
 }
 function stampRecurring() {
-  const cut = ymd(new Date(now() - 180 * 864e5)); let ch = false;
+  let ch = false;
+  const td = new Date(), yd = new Date(td.getFullYear(), td.getMonth(), td.getDate() - 1), yst = ymd(yd);
+  let lch = false;
   const lines = state.sched.rtask.t.split('\n').map(raw => {
-    const l = raw.trim(), x = l && pRT(l); if (!x) return raw;
-    const out = rtBuild(tags(l, true).rest, x.since || todayStr(), new Set([...x.dates].filter(k => k >= cut)));
-    if (out !== l) ch = true; return out;
+    const l = raw.trim(), x = l && pRT(l); if (!x || !x.legacy) return raw;
+    x.dates.forEach(k => { const d = new Date(k + 'T00:00'); if (!isNaN(d) && !hasRec(d, x)) hwRec(d, x, true); });
+    lch = true; return tags(l, true).rest + ' [' + x.cat + ']';
   });
-  if (ch) { state.sched.rtask = {t: lines.join('\n'), u: now()}; cache(); }
+  if (lch) { state.sched.rtask = {t: lines.join('\n'), u: now()}; ch = true; }
+  if (!state.rtdone) { state.rtdone = yst; ch = true; }
+  else if (state.rtdone < yst) {
+    const R = getSched().rtask, lo = new Date(td.getFullYear(), td.getMonth(), td.getDate() - 90), s0 = new Date(state.rtdone + 'T00:00');
+    let d = new Date(s0.getFullYear(), s0.getMonth(), s0.getDate() + 1); if (d < lo) d = lo;
+    for (; d <= yd; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) R.forEach(x => { if (rtOn(x, d) && !hasRec(d, x)) hwRec(d, x, false); });
+    state.rtdone = yst; ch = true;
+  }
+  const g0 = state.sched.gen.t, g1 = g0.replace(/\[(added|done) (\d{1,2}\/\d{1,2}\/)(\d{2})(?=[\s\]])/gi, (m, k, md, yy) => '[' + k + ' ' + md + '20' + yy);
+  if (g1 !== g0) { state.sched.gen = {t: g1, u: now()}; ch = true; }
+  if (ch) cache();
   return ch;
 }
 const doneStamp = u => { const d = new Date(u); return lineD(u) + ' ' + ft(d.getHours() * 60 + d.getMinutes()); };
@@ -508,6 +536,11 @@ function pHw(l) {
 function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); const y = t.getUTCFullYear(); return {y, w: Math.ceil(((t - Date.UTC(y, 0, 1)) / 864e5 + 1) / 7)}; }
 const monOf = d => new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
 function hwGet(y, w) {
+  const out = hwBase(y, w);
+  getSched().rtask.forEach(r => { if (!out.some(c => c[0].toLowerCase() === r.cat)) out.push([r.cat, {}]); });
+  return out;
+}
+function hwBase(y, w) {
   const S = getSched().hw, key = y * 100 + w, K = e => e.y * 100 + e.w, cur = S.filter(e => K(e) === key).pop();
   if (cur) return JSON.parse(JSON.stringify(cur.cls));
   const prev = S.filter(e => K(e) < key).sort((a, b) => K(a) - K(b)).pop() || S.filter(e => K(e) > key).sort((a, b) => K(a) - K(b))[0];
@@ -567,7 +600,7 @@ const agenda = (d, rec, startOnly) => { const ev = eventsOn(d, rec !== false); r
 /* ---------- habits ---------- */
 const hToday = () => { const t = todayStr(), h = getSched().habit; return {tot: h.length, done: h.filter(x => x.days[t]).length}; };
 function bestStreak(h) { let best = 0, run = 0, prev = null; Object.keys(h.days).sort().forEach(k => { const d = new Date(k + 'T00:00'); run = prev && Math.round((d - prev) / 864e5) === 1 ? run + 1 : 1; if (run > best) best = run; prev = d; }); return best; }
-const streakHtml = x => { const b = bestStreak(x); return b ? `<span class="hstk">\uD83D\uDD25 ${streak(x)} \u00B7 Record ${b}</span>` : ''; };
+const streakHtml = x => { const b = bestStreak(x); return b ? `<span class="hstk">\uD83D\uDD25 ${streak(x)} (${b})</span>` : ''; };
 function streak(h) { const d = new Date(); let n = 0; if (!h.days[ymd(d)]) d.setDate(d.getDate() - 1); while (h.days[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
 
 /* ---------- render ---------- */
@@ -600,17 +633,16 @@ function hwItems(t) {
   hwGet(y, w).forEach(([n, dd], ci) => (dd[dk] || []).forEach((l, i) => out.push({n, l, ci, i, dk, wk: y + ':' + w})));
   return out;
 }
-const hwRow = (x, d) => { const dn = /^###/.test(x.l); return `<div class="row${dn ? ' hwd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-wk="${x.wk}" data-c="${x.ci}" data-d="${x.dk}" data-i="${x.i}" aria-label="Toggle Done"></button><span class="t">${esc(x.n.toUpperCase())}: ${esc(x.l.replace(/^###\s*/, ''))}</span>${d ? `<span class="due">${wd(d)}</span>` : ''}</div>`; };
+const hwRow = (x, d) => { const dn = /^###/.test(x.l); return `<div class="row${dn ? ' hwd' : ''}${recOf(x.n, x.l) ? ' rec' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-wk="${x.wk}" data-c="${x.ci}" data-d="${x.dk}" data-i="${x.i}" aria-label="Toggle Done"></button><span class="t">${esc(x.n.toUpperCase())}: ${esc(x.l.replace(/^###\s*/, ''))}</span>${d ? `<span class="due">${wd(d)}</span>` : ''}</div>`; };
 const rtOn = (x, d) => x.days.has(d.getDay()) || x.dom.has(d.getDate()) || (x.dom.has(-1) && new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() === d.getDate());
-const rtShows = (x, d) => rtOn(x, d) && (!x.since || ymd(d) >= x.since);
 function homeP() {
   const t = new Date(), S = getSched(), R = view.range, day = i => new Date(t.getFullYear(), t.getMonth(), t.getDate() + i), ts = ymd(t);
   const up = []; for (let i = 1; i <= R; i++) eventsOn(day(i), false).forEach(e => up.push([day(i), e]));
-  const gen = S.gen.filter(x => !x.k || recent(x)), rt = S.rtask.filter(x => rtShows(x, t)), hw = hwItems(t), apT = [];
+  const gen = S.gen.filter(x => !x.k || recent(x)), rt = rtVirt(t), hw = hwItems(t), apT = [];
   for (let i = 1; i <= R; i++) {
     const d = day(i);
     hwItems(d).filter(x => !/^###/.test(x.l)).forEach(x => apT.push({ts: d.getTime(), h: hwRow(x, d)}));
-    S.rtask.filter(x => rtShows(x, d)).forEach(x => apT.push({ts: d.getTime() + 1, h: rtApp(x, d)}));
+    rtVirt(d).forEach(x => apT.push({ts: d.getTime() + 1, h: rtApp(x, d)}));
   }
   const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay();
   return `<div class="dcols"><div class="dcol">
@@ -625,16 +657,20 @@ function homeP() {
   <div class="panel o6"><h2>Notepad</h2><textarea class="pad" data-k="note" spellcheck="true" aria-label="Notepad">${esc(state.sched.note.t)}</textarea></div></div></div>`;
 }
 
-const hwLines = (items, ci, dk, pv) => items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(l.replace(/^###\s*/, ''))}</span></div>`; }).join('') || '';
+const cellDate = (k, pv) => { const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()); return new Date(st.getFullYear(), st.getMonth(), st.getDate() + (pv ? 0 : HWD.indexOf(k) + 1)); };
+const hwLines = (items, ci, dk, pv) => { const {y, w} = hwWk(false), c = hwGet(y, w)[ci], cat = c ? c[0] : ''; return items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${recOf(cat, l) ? ' rec' : ''}${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(l.replace(/^###\s*/, ''))}</span></div>`; }).join('') || ''; };
+function hwCell(ci, k, pv) {
+  const {y, w} = hwWk(false), c = hwGet(y, w)[ci], cat = c ? c[0].toLowerCase() : '', d = cellDate(k, pv), ds = ymd(d);
+  const virt = rtVirt(d).filter(x => x.cat === cat).map(x => `<div class="hl rec"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="Toggle Done"></button><span>${esc(x.t)}</span></div>`).join('');
+  return hwLines(hwCellItems(ci, k, pv), ci, k, pv) + virt;
+}
 function hwSheet() {
   const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i);
   const {y, w} = hwWk(false), cls = hwGet(y, w), td = todayStr(), S = getSched();
   const days = [{k: 'sun', d: at(0), pv: true}, ...HWD.slice(0, 6).map((k, i) => ({k, d: at(i + 1), pv: false}))];
-  const rcell = d => S.rtask.filter(r => rtShows(r, d)).map(r => { const ds = ymd(d), dn = r.dates.has(ds); return `<div class="hl rec${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="rtog" data-v="${r.i}" data-d="${ds}" aria-label="Toggle Done"></button><span><span class="rmk">\u21BB</span>${esc(r.t)}</span></div>`; }).join('');
-  const recRow = S.rtask.length ? `<tr class="recrow"><td class="hcn"><span class="rcl">\u21BB Recurring</span></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc rc">${rcell(x.d)}</div></td>`).join('')}</tr>` : '';
   return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="hwnow">Now</button><button class="ghost nb arr" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
-  <div class="hww"><table class="hw"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${recRow}${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwLines(hwCellItems(ci, x.k, x.pv), ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
-  <p class="tag hint">Click a cell to type tasks, one per line. Click a circle to mark one done. Edit a category name in the first column; clear it to remove the category. Recurring tasks appear in the top row and are edited in the Recurring Tasks list below.</p></div>`;
+  <div class="hww"><table class="hw"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwCell(ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
+  <p class="tag hint">Click a cell to type tasks, one per line. Click a circle to mark one done. Edit a category name in the first column; clear it to remove the category. Recurring tasks appear in light blue inside their category and are edited in the Recurring Tasks list below.</p></div>`;
 }
 
 const PX = 44;
@@ -675,7 +711,7 @@ function calHtml() {
   } else { title = fmtL(c); body = gridHtml([c]); }
   return `<div class="tb"><h2 style="margin:0;flex:1">${title}</h2><span class="seg">${['month', 'week', 'day'].map(x => `<button class="${m === x ? 'on' : ''}" data-a="mode" data-v="${x}">${cap(x)}</button>`).join('')}</span><span class="navs"><button class="ghost nb arr" data-a="nav" data-v="-1" aria-label="Previous">\u2039</button><button class="ghost nb" data-a="today">Now</button><button class="ghost nb arr" data-a="nav" data-v="1" aria-label="Next">\u203A</button></span></div>${body}`;
 }
-const errHtml = k => getSched().errs[k].map(([n, l]) => `<div>Line ${n} can't be read: ${esc(l)}</div>`).join('');
+const errHtml = k => getSched().errs[k].map(([n, l]) => `<div>Line ${n} can't be read: ${esc(l)}${k === 'rtask' ? ' (needs a category tag at the end, like [mech])' : ''}</div>`).join('');
 function editor(k, title, hint, form) {
   const txt = state.sched[k].t;
   return `<section class="panel"><h2>${title}</h2><p class="tag hint">${hint} Delete a line to remove the event.</p>${form ? `<div class="addbox" data-ab="${k}"><button class="btn" type="button" data-a="addopen">+ Add</button>${form}</div>` : ''}<textarea data-k="${k}" rows="${Math.max(4, txt.split('\n').length + 1)}" spellcheck="false" aria-label="${title}">${esc(txt)}</textarea><div class="errs" id="err-${k}">${errHtml(k)}</div></section>`;
@@ -701,10 +737,10 @@ function taskRow(x, l, compact) {
 }
 const ordS = n => n === -1 ? 'Last' : n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);
 const rtLabel = x => [x.days.size === 7 ? 'Daily' : [1, 2, 3, 4, 5, 6, 0].filter(i => x.days.has(i)).map(i => cap(DAYN[i])).join(' '), [...x.dom].sort((a, b) => a - b).map(ordS).join(' ')].filter(Boolean).join(' \u00B7 ') + (x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : '');
-const rtRow = (x, d) => { const dn = d && x.dates && x.dates.has(d); return `<div class="row rec${dn ? ' done' : ''}">${d ? `<button class="chk" data-a="rtog" data-v="${x.i}" data-d="${d}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button>` : ''}<span class="t"><span class="rmk">\u21BB</span>${esc(x.t)}</span><span class="due">${dn ? 'Completed' : rtLabel(x)}</span></div>`; };
-const rtApp = (x, d) => { const ds = ymd(d), dn = x.dates && x.dates.has(ds); return `<div class="row rec${dn ? ' done' : ''}"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button><span class="t"><span class="rmk">\u21BB</span>${esc(x.t)}</span><span class="due">${wd(d)}${x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : ''}${dn ? ' \u00B7 Completed' : ''}</span></div>`; };
+const rtRow = (x, d) => { const dn = d && rtDone(x, d); return `<div class="row rec${dn ? ' done' : ''}">${d ? `<button class="chk" data-a="rtog" data-v="${x.i}" data-d="${d}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button>` : ''}<span class="t">${esc(x.cat.toUpperCase())}: ${esc(x.t)}</span><span class="due">${rtLabel(x)}</span></div>`; };
+const rtApp = (x, d) => { const ds = ymd(d); return `<div class="row rec"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="Check"></button><span class="t">${esc(x.cat.toUpperCase())}: ${esc(x.t)}</span><span class="due">${wd(d)}${x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : ''}</span></div>`; };
 const genPanel = S => `<div class="panel"><h2>General Tasks</h2>${S.gen.filter(x => !x.k || recent(x)).map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<div class="addbox" data-ab="gen"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="gen"><input type="text" class="desc" name="t" placeholder="Task" required><button class="btn">Add</button></form></div></div>`;
-const recPanel = S => `<div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(x => rtRow(x, rtShows(x, new Date()) ? todayStr() : '')).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Recurring tasks also appear in the top row of the sheet, where they cannot be edited. Check the circle to complete that day's instance.</p></div>`;
+const recPanel = S => { const wk = hwWk(false), cn = hwGet(wk.y, wk.w).map(c => c[0]), td = new Date(); return `<div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(x => rtRow(x, rtOn(x, td) ? todayStr() : '')).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><input type="text" class="dm" name="cat" list="rcats" placeholder="Category" autocomplete="off" required><datalist id="rcats">${cn.map(n => `<option value="${esc(n)}">`).join('')}</datalist><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Each recurring task belongs to a category and shows in that category's row on the sheet, in light blue. Check the circle to complete that day's instance.</p></div>`; };
 const hwVis = () => { const S = getSched(); return hwSheet() + `<div class="cols2" style="margin-top:16px">${genPanel(S)}${recPanel(S)}</div>`; };
 const hwP = () => `<div id="vis">${hwVis()}</div><div class="cols2">${ed('gen')}${ed('rtask')}</div>`;
 function habitVis() {
@@ -720,8 +756,8 @@ const LIST_META = [
   ['once', 'Unique Events', 'Format: mar 5 2026 5pm-6pm description [green]. A start time with am/pm is required; color is optional. When you finish editing, the year is added as a tag like [2026] (it comes back if removed). Unique events are yellow unless you add a color.'],
   ['rec', 'Recurring Events', 'Format: mwf 5pm-6pm description. Days: mwf, tth, su, sa, mon,wed, daily, weekdays, weekends. Times need am/pm: 5pm-6pm, 5-5:30pm, 9am-3. Color tag optional, like [green].'],
   ['bday', 'Birthdays', 'Format: mar 5 1990 name. The year is optional and shows an age. Color tag optional, like [purple].'],
-  ['gen', 'General Tasks', 'One per line, no date needed: buy milk. [added ...] and [done ...] tags are added for you. Start a line with ### to check it off. Drag the handle on the Tasks page or dashboard to reorder.'],
-  ['rtask', 'Recurring Tasks', `One per line: mwf take vitamins, or 1st,15th pay rent for days of the month (last works too). Check them off on the Tasks page or dashboard. Completed days are saved on the line as [done 10/14/26] and [since 10/5/26] marks when tracking began. These tags are managed for you.`],
+  ['gen', 'General Tasks', 'One per line, no date needed: buy milk. [added 10/15/2026] and [done 10/15/2026 3:05pm] tags are added for you. Start a line with ### to check it off. Drag the handle on the Tasks page or dashboard to reorder.'],
+  ['rtask', 'Recurring Tasks', 'One per line, with a category tag at the end: mwf take vitamins [mech], or 1st,15th pay rent [home] for days of the month (last works too). The category is a category on the Tasks sheet and is added if missing. Check tasks off on the Tasks page or dashboard: a checked task is added to its category on the Tasks sheet as done, and a day that passes unchecked is recorded there too.'],
   ['hw', 'Tasks', 'One line per week: year:week:data, like 2026:42:[["math",{"mon":["ch 3 hw"],"wed":["### quiz"]}]]. Weeks run Monday to Sunday. The Tasks page edits these lines; ### marks a task done.'],
   ['habit', 'Habits', 'One habit per line with the days you did it: meditate | 2026-10-12, 2026-10-13.'],
   ['note', 'Notepad', 'Free text. The notepad on the dashboard edits this same box.'],
@@ -795,7 +831,7 @@ $app.addEventListener('click', e => {
   if (a === 'today') { view.cur = new Date(); return reCal(); }
   if (a === 'nav') { const k = +v; view.cur = view.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + k, 1) : new Date(c.getFullYear(), c.getMonth(), c.getDate() + k * (view.mode === 'week' ? 7 : 1)); return reCal(); }
   if (a === 'goday') { view.cur = new Date(v + 'T00:00'); view.mode = 'day'; return reCal(); }
-  if (a === 'rtog') { lineOp('rtask', +v, l => rtToggle(l, b.dataset.d)); if (b.closest('table.hw')) { changed(true); b.classList.toggle('on'); const r = b.closest('.hl'); if (r) r.classList.toggle('hd'); return; } }
+  if (a === 'rtog') return rtTog(+v, b.dataset.d);
   if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[done [^\]]*\]/i, ''); return '### ' + l + ' [done ' + doneStamp(u) + ']'; });
   if (a === 'hwnav') { view.hw = new Date(view.hw.getFullYear(), view.hw.getMonth(), view.hw.getDate() + 7 * +v); return render(true); }
   if (a === 'hwnow') { view.hw = new Date(); return render(true); }
@@ -819,7 +855,7 @@ $app.addEventListener('click', e => {
 });
 const CODE = {1: 'm', 2: 't', 3: 'w', 4: 'th', 5: 'f', 6: 'sa', 0: 'su'}, t24 = v => { const [h, m] = v.split(':').map(Number); return h * 60 + m; };
 function mkLine(k, d) {
-  const t = (d.get('t') || '').trim().toLowerCase(); let p = '', ytag = 0;
+  const t = (d.get('t') || '').trim().toLowerCase(); let p = '', ytag = 0, cat = '';
   if (k === 'rec' || k === 'rtask') {
     const ds = d.getAll('d').map(Number).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)), parts = [];
     if (ds.length) parts.push(ds.length === 7 ? 'daily' : ds.map(i => CODE[i]).join(''));
@@ -829,6 +865,7 @@ function mkLine(k, d) {
       if (dm.length) parts.push(dm.join(','));
     }
     if (!parts.length) { toast('Pick at least one day'); return; }
+    if (k === 'rtask') { cat = (d.get('cat') || '').trim().toLowerCase().replace(/[\[\]]/g, '').trim(); if (!cat) { toast('Add a category, like mech'); return; } }
     p = parts.join(' ');
   } else if (k !== 'gen') {
     const mo0 = (d.get('mo') || '').trim(), mi = /^\d{1,2}$/.test(mo0) ? +mo0 - 1 : MON.indexOf(mo0.slice(0, 3).toLowerCase()), da = +d.get('da');
@@ -845,7 +882,7 @@ function mkLine(k, d) {
     if (sm == null || (eRaw && em == null)) { toast('Enter a time with am/pm, like 1:30pm'); return; }
     tr = fmtRange(sm, em);
   }
-  const meta = (ytag ? ' [' + ytag + ']' : '') + (k === 'task' || k === 'gen' ? ' [added ' + lineD(now()) + ']' : '');
+  const meta = (ytag ? ' [' + ytag + ']' : '') + (k === 'task' || k === 'gen' ? ' [added ' + lineD(now()) + ']' : '') + (cat ? ' [' + cat + ']' : '');
   return (p ? p + ' ' : '') + (tr ? tr + ' ' : '') + t + meta;
 }
 $app.addEventListener('submit', e => {
@@ -893,7 +930,7 @@ $app.addEventListener('focusout', e => {
   } else if (ds.hw) {
     const ci = +ds.c, k = ds.d, pv = ds.pv === '1', lines = t.value.split('\n').map(x => x.trim()).filter(Boolean);
     if (JSON.stringify(lines) !== JSON.stringify(hwCellItems(ci, k, pv))) hwMod(ci, k, pv, () => lines, true);
-    t.parentNode.innerHTML = hwLines(lines, ci, k, pv);
+    t.parentNode.innerHTML = hwCell(ci, k, pv);
   }
 });
 $app.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('done-box')) view.dopen = e.target.open; }, true);
