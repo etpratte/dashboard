@@ -181,6 +181,15 @@ textarea.code{font-size:12px;margin:8px 0}.steps{margin:8px 0;padding-left:20px;
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .mk{width:22px;text-align:center;font-weight:700;flex:none}.mk.ok{color:var(--ok)}.mk.no{color:var(--warn)}
+.hrow{display:flex;align-items:center;gap:6px}.hrow .hcin{flex:1 1 auto;min-width:0;width:auto}.hstk{white-space:nowrap;font-size:11px;color:var(--mute);flex:none}
+.hab th:first-child,.hab td.hcn{width:240px}
+.hl,.hl.hd{font-weight:400}
+.hl .chk.on{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.8 5.3 4 7.5 8.3 2.6' fill='none' stroke='%2312171d' stroke-width='1.7'/%3E%3C/svg%3E");background-size:10px 10px;background-position:center;background-repeat:no-repeat}
+.hl .chk.on::after{content:none}
+.rmk{color:var(--acc);margin-right:5px;font-weight:700}
+.hl.rec{border-left:2px solid var(--acc);background:rgba(122,169,255,.08)}.hl.rec.hd{background:var(--oksoft);border-left-color:var(--ok)}
+.hw tr.recrow td{background:rgba(122,169,255,.04)}.rcl{display:block;padding:4px;font-weight:600;color:var(--acc)}.hc.rc{cursor:default}
+.row.rec{border-left:2px solid var(--acc);padding-left:8px}
 </style>
 </head>
 <body>
@@ -201,7 +210,7 @@ const todayStr = () => ymd(new Date());
 const now = () => Date.now();
 
 let state = {};
-let view = {tab: ['home', 'sched', 'tasks', 'hw', 'habit', 'data'].includes(localStorage.getItem('dash-tab')) ? localStorage.getItem('dash-tab') : 'home', mode: 'week', cur: new Date(), hw: new Date(), hab: new Date(), help: localStorage.getItem('dash-help') === '1', range: +localStorage.getItem('dash-range') || 14};
+let view = {tab: (t => t === 'tasks' ? 'hw' : ['home', 'sched', 'hw', 'habit', 'data'].includes(t) ? t : 'home')(localStorage.getItem('dash-tab')), mode: 'week', cur: new Date(), hw: new Date(), hab: new Date(), help: localStorage.getItem('dash-help') === '1', range: +localStorage.getItem('dash-range') || 14};
 (function () {
   if (typeof location === 'undefined') return;
   const m = /^#relay=(.+)$/.exec(location.hash); if (!m) return;
@@ -325,8 +334,8 @@ const fmtD = (d, y) => d.toLocaleDateString(undefined, y ? {month: 'short', day:
 const fmtL = d => d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'});
 const fts = ts => { const d = new Date(ts); return fmtD(d, d.getFullYear() !== new Date().getFullYear()); };
 const ft = n => { const h = Math.floor(n / 60), m = n % 60; return ((h + 11) % 12 + 1) + (m ? ':' + pad(m) : '') + (h < 12 ? 'am' : 'pm'); };
-const LISTS = ['once', 'rec', 'bday', 'task', 'rtask', 'gen', 'habit', 'quote', 'hw', 'note'];
-const lineD = ts => { const d = new Date(ts); return MON[d.getMonth()] + ' ' + d.getDate() + ' ' + d.getFullYear(); };
+const LISTS = ['once', 'rec', 'bday', 'rtask', 'gen', 'habit', 'quote', 'hw', 'note'];
+const lineD = ts => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2); };
 const oldToNew = l => { const x = pOldTodo(l.trim()); if (!x) return l; return (x.k ? '### ' : '') + x.t + (x.c ? ' [added ' + lineD(x.c) + ']' : '') + (x.kd ? ' [done ' + lineD(x.kd) + ']' : ''); };
 function norm(s) {
   s.sched = s.sched || {};
@@ -405,7 +414,13 @@ function pBday(l) {
   return {m: mo, d, y: m[3] ? +m[3] : 0, t: m[4].trim()};
 }
 const DT = /^([a-z]{3})[a-z]*\.?\s+(\d{1,2})\s+(\d{4})(?:\s+|$)/i;
-function pDate(r) { const m = DT.exec(r); if (!m) return null; const mo = MON.indexOf(m[1].toLowerCase()), y = +m[3], d = +m[2]; return mo < 0 || !dateOk(y, mo, d) ? null : {ts: new Date(y, mo, d).getTime(), n: m[0].length}; }
+function pDate(r) {
+  let m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+|$)/.exec(r);
+  if (m) { const y = m[3].length === 2 ? 2000 + +m[3] : +m[3], mo = +m[1] - 1, d = +m[2]; return dateOk(y, mo, d) ? {ts: new Date(y, mo, d).getTime(), n: m[0].length} : null; }
+  m = DT.exec(r); if (!m) return null;
+  const mo = MON.indexOf(m[1].toLowerCase()), y = +m[3], d = +m[2];
+  return mo < 0 || !dateOk(y, mo, d) ? null : {ts: new Date(y, mo, d).getTime(), n: m[0].length};
+}
 function pOldTodo(l) {
   let r = l, k = false, c = null, kd = null, m;
   if (r.startsWith('###')) { k = true; r = r.slice(3).trim(); }
@@ -415,13 +430,14 @@ function pOldTodo(l) {
 }
 const COLORS = {red: ['#dc2626', '#fff'], orange: ['#ea580c', '#fff'], yellow: ['#facc15', '#1a1400'], green: ['#16a34a', '#fff'], teal: ['#0d9488', '#fff'], blue: ['#2563eb', '#fff'], purple: ['#7c3aed', '#fff'], pink: ['#ec4899', '#fff'], gray: ['#6b7280', '#fff']};
 COLORS.grey = COLORS.gray;
+const toIso = t => { let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t); if (m) return t; m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(t); if (!m) return null; const y = m[3].length === 2 ? 2000 + +m[3] : +m[3]; return y + '-' + pad(+m[1]) + '-' + pad(+m[2]); };
+const toShort = k => { const [y, m, d] = k.split('-').map(Number); return m + '/' + d + '/' + String(y).slice(2); };
+const DL = /^(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:[\s,]+(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}))*$/;
 function tags(l, allowDates) {
-  let r = l.trim(), color = null, added = null, done = null, year = 0, bad = false, dates = null, missed = null, since = null, m;
+  let r = l.trim(), color = null, added = null, done = null, year = 0, bad = false, dates = null, since = null, m;
   while ((m = /\s*\[([^\]]*)\]$/.exec(r))) {
-    const x = m[1].trim().toLowerCase(), d = /^(added|done)\s+(.+)$/.exec(x), pd = d && pDate(d[2]), dm = allowDates && /^done\s+(\d{4}-\d{2}-\d{2}(?:[\s,]+\d{4}-\d{2}-\d{2})*)$/.exec(x);
-    if (dm) { dates = new Set(dm[1].split(/[\s,]+/)); }
-    else if (allowDates && /^missed\s+\d{4}-\d{2}-\d{2}(?:[\s,]+\d{4}-\d{2}-\d{2})*$/.test(x)) { missed = new Set(x.replace(/^missed\s+/, '').split(/[\s,]+/)); }
-    else if (allowDates && /^since\s+\d{4}-\d{2}-\d{2}$/.test(x)) { since = x.replace(/^since\s+/, ''); }
+    const x = m[1].trim().toLowerCase(), d = /^(added|done)\s+(.+)$/.exec(x), pd = d && pDate(d[2]), rt = allowDates && /^(done|missed|since)\s+(.+)$/.exec(x);
+    if (rt && DL.test(rt[2])) { const set = new Set(rt[2].split(/[\s,]+/).map(toIso)); if (rt[1] === 'done') dates = set; else if (rt[1] === 'since') since = [...set][0]; }
     else if (d && pd) {
       let ts = pd.ts; const rest = d[2].slice(pd.n).trim();
       if (rest) { const t = /^(\d{1,2})(?::(\d{2}))?\s*([ap]m)$/.exec(rest), mm = t && hm(t[1], t[2], t[3]); if (mm == null) { bad = true; break; } ts += mm * 60000; }
@@ -432,46 +448,35 @@ function tags(l, allowDates) {
     else { bad = true; break; }
     r = r.slice(0, m.index).trim();
   }
-  return {rest: r, color, added, done, year, bad, dates, missed, since};
+  return {rest: r, color, added, done, year, bad, dates, since};
 }
-function pRT(l) { const g = tags(l, true); if (g.bad || g.color || g.added || g.done != null || g.year) return null; const r = pRec(g.rest, false, true); if (r) { r.dates = g.dates || new Set(); r.missed = g.missed || new Set(); r.since = g.since; } return r; }
-const rtBuild = (rest, since, done, missed) => rest + (since ? ' [since ' + since + ']' : '') + (done.size ? ' [done ' + [...done].sort().join(', ') + ']' : '') + (missed.size ? ' [missed ' + [...missed].sort().join(', ') + ']' : '');
+function pRT(l) { const g = tags(l, true); if (g.bad || g.color || g.added || g.done != null || g.year) return null; const r = pRec(g.rest, false, true); if (r) { r.dates = g.dates || new Set(); r.since = g.since; } return r; }
+const rtBuild = (rest, since, done) => rest + (since ? ' [since ' + toShort(since) + ']' : '') + (done.size ? ' [done ' + [...done].sort().map(toShort).join(', ') + ']' : '');
 function rtToggle(l, d) {
-  const g = tags(l.trim(), true), done = new Set(g.dates || []), missed = new Set(g.missed || []);
-  if (done.has(d)) done.delete(d); else { done.add(d); missed.delete(d); }
-  const cut = ymd(new Date(now() - 180 * 864e5));
-  [...done].forEach(k => { if (k < cut) done.delete(k); }); [...missed].forEach(k => { if (k < cut) missed.delete(k); });
-  return rtBuild(g.rest, g.since || todayStr(), done, missed);
+  const g = tags(l.trim(), true), done = new Set(g.dates || []);
+  if (done.has(d)) done.delete(d); else done.add(d);
+  return rtBuild(g.rest, g.since || todayStr(), done);
 }
 function stampRecurring() {
-  const today = todayStr(), cut = ymd(new Date(now() - 180 * 864e5)); let ch = false;
+  const cut = ymd(new Date(now() - 180 * 864e5)); let ch = false;
   const lines = state.sched.rtask.t.split('\n').map(raw => {
     const l = raw.trim(), x = l && pRT(l); if (!x) return raw;
-    const g = tags(l, true), done = new Set(g.dates || []), missed = new Set(g.missed || []), since = g.since || today;
-    for (let d = new Date(since + 'T00:00'); ymd(d) < today; d.setDate(d.getDate() + 1)) { const k = ymd(d); if (rtOn(x, d) && !done.has(k)) missed.add(k); }
-    [...done].forEach(k => { if (k < cut) done.delete(k); }); [...missed].forEach(k => { if (k < cut || done.has(k)) missed.delete(k); });
-    const out = rtBuild(g.rest, since, done, missed); if (out !== l) ch = true; return out;
+    const out = rtBuild(tags(l, true).rest, x.since || todayStr(), new Set([...x.dates].filter(k => k >= cut)));
+    if (out !== l) ch = true; return out;
   });
   if (ch) { state.sched.rtask = {t: lines.join('\n'), u: now()}; cache(); }
   return ch;
-}
-function pTask(l) {
-  let r = l.trim(), k = false; if (r.startsWith('###')) { k = true; r = r.slice(3).trim(); }
-  const g = tags(r), m = /^([a-z]{3})[a-z]*\.?\s+(\d{1,2})(?:\s+(\d{4}))?(?:\s+|$)(.*)$/i.exec(g.rest); if (g.bad || !m) return null;
-  const mo = MON.indexOf(m[1].toLowerCase()), y = m[3] ? +m[3] : g.year || new Date().getFullYear(), d = +m[2];
-  if (mo < 0 || !dateOk(y, mo, d) || !m[4].trim()) return null;
-  return {k, due: new Date(y, mo, d).getTime(), added: g.added, done: g.done, t: m[4].trim(), hasYear: !!(m[3] || g.year)};
 }
 const doneStamp = u => { const d = new Date(u); return lineD(u) + ' ' + ft(d.getHours() * 60 + d.getMinutes()); };
 function fixLines(key, text) {
   const yr = new Date().getFullYear(), st = lineD(now()), ds = doneStamp(now());
   return text.split('\n').map(raw => {
-    const l = raw.trim(), x = l && (key === 'task' ? pTask(l) : key === 'gen' ? pGen(l) : evOnce(l)); if (!x) return raw;
+    const l = raw.trim(), x = l && (key === 'gen' ? pGen(l) : evOnce(l)); if (!x) return raw;
     const pre = /^###/.test(l) ? '### ' : '', body = l.replace(/^###\s*/, ''), g = tags(body);
     let out = pre + g.rest;
-    if (key !== 'gen' && !x.hasYear) out += ' [' + yr + ']';
+    if (key === 'once' && !x.hasYear) out += ' [' + yr + ']';
     out += body.slice(g.rest.length);
-    if (key !== 'once') { if (!g.added) out += ' [added ' + st + ']'; if (x.k && !g.done) out += ' [done ' + ds + ']'; }
+    if (key === 'gen') { if (!g.added) out += ' [added ' + st + ']'; if (x.k && !g.done) out += ' [done ' + ds + ']'; }
     return out;
   }).join('\n');
 }
@@ -535,7 +540,7 @@ const evOnce = l => { const g = tags(l); if (g.bad) return null; const r = pOnce
 let memo = {k: '', v: null};
 function getSched() {
   const s = state.sched, k = LISTS.map(x => s[x].t).join('\u0001'); if (memo.k === k) return memo.v;
-  const out = {errs: {}}, fns = {once: evOnce, rec: ev(pRec), bday: ev(pBday), task: pTask, rtask: pRT, gen: pGen, habit: pHabit, quote: pQuote, hw: pHw, note: l => ({t: l})};
+  const out = {errs: {}}, fns = {once: evOnce, rec: ev(pRec), bday: ev(pBday), rtask: pRT, gen: pGen, habit: pHabit, quote: pQuote, hw: pHw, note: l => ({t: l})};
   for (const key of LISTS) {
     out[key] = []; out.errs[key] = [];
     s[key].t.split('\n').forEach((raw, i) => {
@@ -561,10 +566,12 @@ const agenda = (d, rec, startOnly) => { const ev = eventsOn(d, rec !== false); r
 
 /* ---------- habits ---------- */
 const hToday = () => { const t = todayStr(), h = getSched().habit; return {tot: h.length, done: h.filter(x => x.days[t]).length}; };
+function bestStreak(h) { let best = 0, run = 0, prev = null; Object.keys(h.days).sort().forEach(k => { const d = new Date(k + 'T00:00'); run = prev && Math.round((d - prev) / 864e5) === 1 ? run + 1 : 1; if (run > best) best = run; prev = d; }); return best; }
+const streakHtml = x => { const b = bestStreak(x); return b ? `<span class="hstk">\uD83D\uDD25 ${streak(x)} \u00B7 Record ${b}</span>` : ''; };
 function streak(h) { const d = new Date(); let n = 0; if (!h.days[ymd(d)]) d.setDate(d.getDate() - 1); while (h.days[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
 
 /* ---------- render ---------- */
-const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['hw', 'HW'], ['tasks', 'Tasks'], ['habit', 'Habits'], ['data', 'Settings']];
+const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['hw', 'Tasks'], ['habit', 'Habits'], ['data', 'Settings']];
 const statusText = () => ({synced: 'Synced', syncing: 'Syncing\u2026', saving: 'Saving\u2026', error: 'Sync Failed, Will Retry', offline: 'Not Synced'}[status]);
 function render(force) {
   if (!signedIn && !known()) {
@@ -579,7 +586,7 @@ function render(force) {
   $app.innerHTML = `<header><div class="hd"><h1>Big Guy Life Dashboard</h1><span class="dt">${d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'})}</span></div>
   <div class="sync"><span id="sync">${statusText()}</span> ${signedIn ? '' : '<button class="btn" data-a="signin">Sign In To Sync</button>'}</div></header>
   <nav class="tabs">${TABS.map(([k, n]) => `<button class="tab${view.tab === k ? ' on' : ''}" data-a="tab" data-v="${k}">${n}</button>`).join('')}</nav>
-  ${view.tab === 'data' ? '' : errBanner(view.tab)}${({home: homeP, sched: schedP, tasks: tasksP, hw: hwP, habit: habitP, data: dataP})[view.tab]()}`;
+  ${view.tab === 'data' ? '' : errBanner(view.tab)}${({home: homeP, sched: schedP, hw: hwP, habit: habitP, data: dataP})[view.tab]()}`;
   restoreDrafts();
   $app.querySelectorAll('textarea.pad').forEach(fit);
   if (view.rf) { const el = $app.querySelector(`[name="${view.rf}"]`); view.rf = null; if (el) el.focus(); }
@@ -593,23 +600,25 @@ function hwItems(t) {
   hwGet(y, w).forEach(([n, dd], ci) => (dd[dk] || []).forEach((l, i) => out.push({n, l, ci, i, dk, wk: y + ':' + w})));
   return out;
 }
-const hwRow = x => { const dn = /^###/.test(x.l); return `<div class="row${dn ? ' hwd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-wk="${x.wk}" data-c="${x.ci}" data-d="${x.dk}" data-i="${x.i}" aria-label="Toggle Done"></button><span class="t">${esc(x.n.toUpperCase())}: ${esc(x.l.replace(/^###\s*/, ''))}</span></div>`; };
+const hwRow = (x, d) => { const dn = /^###/.test(x.l); return `<div class="row${dn ? ' hwd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-wk="${x.wk}" data-c="${x.ci}" data-d="${x.dk}" data-i="${x.i}" aria-label="Toggle Done"></button><span class="t">${esc(x.n.toUpperCase())}: ${esc(x.l.replace(/^###\s*/, ''))}</span>${d ? `<span class="due">${wd(d)}</span>` : ''}</div>`; };
 const rtOn = (x, d) => x.days.has(d.getDay()) || x.dom.has(d.getDate()) || (x.dom.has(-1) && new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() === d.getDate());
-const lookSel = () => `<label class="la"><span class="tag">Look Ahead</span><select data-r="1" aria-label="Look Ahead Days">${[7, 14, 30, 60].map(n => `<option value="${n}"${n === view.range ? ' selected' : ''}>${n} Days</option>`).join('')}</select></label>`;
+const rtShows = (x, d) => rtOn(x, d) && (!x.since || ymd(d) >= x.since);
 function homeP() {
-  const t = new Date(), S = getSched(), R = view.range, day = i => new Date(t.getFullYear(), t.getMonth(), t.getDate() + i), td = day(0).getTime(), end = day(R).getTime();
+  const t = new Date(), S = getSched(), R = view.range, day = i => new Date(t.getFullYear(), t.getMonth(), t.getDate() + i), ts = ymd(t);
   const up = []; for (let i = 1; i <= R; i++) eventsOn(day(i), false).forEach(e => up.push([day(i), e]));
-  const due = S.task.filter(x => (!x.k && x.due <= td) || recent(x)).sort((a, b) => a.due - b.due), rt = S.rtask.filter(x => rtOn(x, t)), gen = S.gen.filter(x => !x.k || recent(x));
-  const apT = S.task.filter(x => !x.k && x.due > td && x.due <= end).map(x => ({ts: x.due, h: taskRow(x, 'task')}));
-  for (let i = 1; i <= R; i++) S.rtask.filter(x => rtOn(x, day(i))).forEach(x => apT.push({ts: day(i).getTime() + 1, h: rtApp(x, day(i))}));
-  apT.sort((a, b) => a.ts - b.ts);
-  const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay(), hw = hwItems(t);
+  const gen = S.gen.filter(x => !x.k || recent(x)), rt = S.rtask.filter(x => rtShows(x, t)), hw = hwItems(t), apT = [];
+  for (let i = 1; i <= R; i++) {
+    const d = day(i);
+    hwItems(d).filter(x => !/^###/.test(x.l)).forEach(x => apT.push({ts: d.getTime(), h: hwRow(x, d)}));
+    S.rtask.filter(x => rtShows(x, d)).forEach(x => apT.push({ts: d.getTime() + 1, h: rtApp(x, d)}));
+  }
+  const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay();
   return `<div class="dcols"><div class="dcol">
   <div class="panel o1"><h2>Today</h2>${agenda(t, true, true)}</div>
   <div class="panel o3"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd2(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div></div>
   <div class="dcol">
-  <div class="panel o2"><h2>Tasks Today</h2><h3 class="sub">HW</h3><div class="grp">${hw.map(hwRow).join('') || none('No HW Due Today.')}</div><div class="sep"></div><h3 class="sub">Tasks</h3><div class="grp">${due.map(x => taskRow(x, 'task', true)).join('')}${rt.map(x => rtRow(x, ymd(t))).join('')}${due.length + rt.length ? '' : none('Nothing Due Today.')}</div></div>
-  <div class="panel o4"><h2>Approaching Tasks</h2>${apT.map(x => x.h).join('') || none('Nothing Due Soon.')}</div>
+  <div class="panel o2"><h2>Tasks Today</h2>${hw.map(x => hwRow(x)).join('')}${rt.map(x => rtRow(x, ts)).join('')}${hw.length + rt.length ? '' : none('Nothing Due Today.')}</div>
+  <div class="panel o4"><h2>Approaching Tasks</h2>${apT.sort((a, b) => a.ts - b.ts).map(x => x.h).join('') || none('Nothing Due Soon.')}</div>
   <div class="panel o5"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || none('No General Tasks.')}</div></div>
   <div class="dcol">
   <div class="panel qbox o0">${q ? `<div class="qq">${esc(q.q)}</div>${q.a ? `<div class="qa">\u2014 ${esc(q.a)}</div>` : ''}` : '<div class="qa">Add quotes on the Settings page.</div>'}</div>
@@ -617,13 +626,15 @@ function homeP() {
 }
 
 const hwLines = (items, ci, dk, pv) => items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(l.replace(/^###\s*/, ''))}</span></div>`; }).join('') || '';
-function hwP() {
+function hwSheet() {
   const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i);
-  const {y, w} = hwWk(false), cls = hwGet(y, w), td = todayStr();
+  const {y, w} = hwWk(false), cls = hwGet(y, w), td = todayStr(), S = getSched();
   const days = [{k: 'sun', d: at(0), pv: true}, ...HWD.slice(0, 6).map((k, i) => ({k, d: at(i + 1), pv: false}))];
+  const rcell = d => S.rtask.filter(r => rtShows(r, d)).map(r => { const ds = ymd(d), dn = r.dates.has(ds); return `<div class="hl rec${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="rtog" data-v="${r.i}" data-d="${ds}" aria-label="Toggle Done"></button><span><span class="rmk">\u21BB</span>${esc(r.t)}</span></div>`; }).join('');
+  const recRow = S.rtask.length ? `<tr class="recrow"><td class="hcn"><span class="rcl">\u21BB Recurring</span></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc rc">${rcell(x.d)}</div></td>`).join('')}</tr>` : '';
   return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="hwnow">Now</button><button class="ghost nb arr" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
-  <div class="hww"><table class="hw"><thead><tr><th>Class</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Class Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwLines(hwCellItems(ci, x.k, x.pv), ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Class" aria-label="Add Class"></td><td colspan="7"></td></tr></tbody></table></div>
-  <p class="tag hint">Click a cell to type assignments, one per line. Click a circle to mark one done. Edit a class name in the first column; clear it to remove the class.</p></div>`;
+  <div class="hww"><table class="hw"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${recRow}${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwLines(hwCellItems(ci, x.k, x.pv), ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
+  <p class="tag hint">Click a cell to type tasks, one per line. Click a circle to mark one done. Edit a category name in the first column; clear it to remove the category. Recurring tasks appear in the top row and are edited in the Recurring Tasks list below.</p></div>`;
 }
 
 const PX = 44;
@@ -661,7 +672,7 @@ function calHtml() {
     const s = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
     title = weekTitle(s);
     body = gridHtml([...Array(7)].map((_, i) => new Date(s.getFullYear(), s.getMonth(), s.getDate() + i)));
-  } else { title = fmtL(c); body = gridHtml([c], false); }
+  } else { title = fmtL(c); body = gridHtml([c]); }
   return `<div class="tb"><h2 style="margin:0;flex:1">${title}</h2><span class="seg">${['month', 'week', 'day'].map(x => `<button class="${m === x ? 'on' : ''}" data-a="mode" data-v="${x}">${cap(x)}</button>`).join('')}</span><span class="navs"><button class="ghost nb arr" data-a="nav" data-v="-1" aria-label="Previous">\u2039</button><button class="ghost nb" data-a="today">Now</button><button class="ghost nb arr" data-a="nav" data-v="1" aria-label="Next">\u203A</button></span></div>${body}`;
 }
 const errHtml = k => getSched().errs[k].map(([n, l]) => `<div>Line ${n} can't be read: ${esc(l)}</div>`).join('');
@@ -690,29 +701,17 @@ function taskRow(x, l, compact) {
 }
 const ordS = n => n === -1 ? 'Last' : n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);
 const rtLabel = x => [x.days.size === 7 ? 'Daily' : [1, 2, 3, 4, 5, 6, 0].filter(i => x.days.has(i)).map(i => cap(DAYN[i])).join(' '), [...x.dom].sort((a, b) => a - b).map(ordS).join(' ')].filter(Boolean).join(' \u00B7 ') + (x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : '');
-const rtRow = (x, d) => { const dn = d && x.dates && x.dates.has(d); return `<div class="row${dn ? ' done' : ''}">${d ? `<button class="chk" data-a="rtog" data-v="${x.i}" data-d="${d}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button>` : ''}<span class="t">${esc(nice(x.t))}</span><span class="due">${dn ? 'Completed' : rtLabel(x)}</span></div>`; };
-const rtApp = (x, d) => { const ds = ymd(d), dn = x.dates && x.dates.has(ds); return `<div class="row${dn ? ' done' : ''}"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button><span class="t">${esc(nice(x.t))}</span><span class="due">${wd(d)}${x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : ''}${dn ? ' \u00B7 Completed' : ''}</span></div>`; };
-function rtHist(S) {
-  const rows = [];
-  S.rtask.forEach(x => { x.dates.forEach(d => rows.push([d, x, 1])); x.missed.forEach(d => rows.push([d, x, 0])); });
-  rows.sort((a, b) => b[0].localeCompare(a[0]) || a[1].i - b[1].i);
-  return `<div class="panel"><h2>Recurring History (${rows.length})</h2>${rows.slice(0, 30).map(([d, x, ok]) => `<div class="row"><span class="mk ${ok ? 'ok' : 'no'}">${ok ? '\u2713' : '\u2717'}</span><span class="t">${esc(nice(x.t))}</span><span class="due">${wd(new Date(d + 'T00:00'))} \u00B7 ${ok ? 'Completed' : 'Missed'}</span></div>`).join('') || '<div class="empty">No History Yet.</div>'}</div>`;
-}
-function tasksVis() {
-  const S = getSched(), open = S.task.filter(x => !x.k || recent(x)).sort((a, b) => a.due - b.due), gen = S.gen.filter(x => !x.k || recent(x));
-  const done = [...S.task.map(x => [x, 'task']), ...S.gen.map(x => [x, 'gen'])].filter(([x]) => x.k).sort((a, b) => (b[0].done || 0) - (a[0].done || 0));
-  const md = `<input type="text" class="sm" name="mo" placeholder="Month" autocapitalize="off" required><input type="number" class="dy" name="da" min="1" max="31" placeholder="Day" required>`;
-  return `<div class="cols3"><div class="panel"><h2>Tasks</h2>${open.map(x => taskRow(x, 'task')).join('') || '<div class="empty">No Dated Tasks.</div>'}<div class="addbox" data-ab="task"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="task"><input type="text" class="desc" name="t" placeholder="Task" required>${md}<button class="btn">Add</button></form></div></div>
-  <div class="panel"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<div class="addbox" data-ab="gen"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="gen"><input type="text" name="t" placeholder="Task" required><button class="btn">Add</button></form></div></div>
-  <div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(x => rtRow(x, rtOn(x, new Date()) ? todayStr() : '')).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Check the circle to complete that day's instance.</p></div></div>
-  <div class="panel"><h2>Checked Off (${done.length})</h2>${done.map(([x, l]) => taskRow(x, l)).join('') || '<div class="empty">Nothing Checked Yet.</div>'}</div>${rtHist(S)}`;
-}
-const tasksP = () => `<div id="vis">${tasksVis()}</div><div class="cols3">${ed('task')}${ed('gen')}${ed('rtask')}</div>`;
+const rtRow = (x, d) => { const dn = d && x.dates && x.dates.has(d); return `<div class="row rec${dn ? ' done' : ''}">${d ? `<button class="chk" data-a="rtog" data-v="${x.i}" data-d="${d}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button>` : ''}<span class="t"><span class="rmk">\u21BB</span>${esc(x.t)}</span><span class="due">${dn ? 'Completed' : rtLabel(x)}</span></div>`; };
+const rtApp = (x, d) => { const ds = ymd(d), dn = x.dates && x.dates.has(ds); return `<div class="row rec${dn ? ' done' : ''}"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button><span class="t"><span class="rmk">\u21BB</span>${esc(x.t)}</span><span class="due">${wd(d)}${x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : ''}${dn ? ' \u00B7 Completed' : ''}</span></div>`; };
+const genPanel = S => `<div class="panel"><h2>General Tasks</h2>${S.gen.filter(x => !x.k || recent(x)).map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<div class="addbox" data-ab="gen"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="gen"><input type="text" class="desc" name="t" placeholder="Task" required><button class="btn">Add</button></form></div></div>`;
+const recPanel = S => `<div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(x => rtRow(x, rtShows(x, new Date()) ? todayStr() : '')).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Recurring tasks also appear in the top row of the sheet, where they cannot be edited. Check the circle to complete that day's instance.</p></div>`;
+const hwVis = () => { const S = getSched(); return hwSheet() + `<div class="cols2" style="margin-top:16px">${genPanel(S)}${recPanel(S)}</div>`; };
+const hwP = () => `<div id="vis">${hwVis()}</div><div class="cols2">${ed('gen')}${ed('rtask')}</div>`;
 function habitVis() {
   const c = view.hab, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i), td = todayStr();
   const days = [...Array(7)].map((_, i) => ({k: HWD[(i + 6) % 7], d: at(i)})), h = getSched().habit;
   return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="habnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="habnow">Now</button><button class="ghost nb arr" data-a="habnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
-  <div class="hww"><table class="hw hab"><thead><tr><th>Habit</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${h.map(x => `<tr><td class="hcn"><input class="hcin nc" data-hbn="${x.i}" value="${esc(nice(x.name))}" aria-label="Habit Name">${streak(x) ? `<div class="hstk">\uD83D\uDD25 ${streak(x)}</div>` : ''}</td>${days.map(dd => { const s = ymd(dd.d); return `<td class="hbc${s === td ? ' tdy' : ''}"><button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button></td>`; }).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hbn="new" placeholder="Add Habit" aria-label="Add Habit"></td><td colspan="7"></td></tr></tbody></table></div></div>`;
+  <div class="hww"><table class="hw hab"><thead><tr><th>Habit</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${h.map(x => `<tr><td class="hcn"><div class="hrow"><input class="hcin nc" data-hbn="${x.i}" value="${esc(nice(x.name))}" aria-label="Habit Name">${streakHtml(x)}</div></td>${days.map(dd => { const s = ymd(dd.d); return `<td class="hbc${s === td ? ' tdy' : ''}"><button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button></td>`; }).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hbn="new" placeholder="Add Habit" aria-label="Add Habit"></td><td colspan="7"></td></tr></tbody></table></div></div>`;
 }
 const habitP = () => `<div id="vis">${habitVis()}</div>`;
 
@@ -721,10 +720,9 @@ const LIST_META = [
   ['once', 'Unique Events', 'Format: mar 5 2026 5pm-6pm description [green]. A start time with am/pm is required; color is optional. When you finish editing, the year is added as a tag like [2026] (it comes back if removed). Unique events are yellow unless you add a color.'],
   ['rec', 'Recurring Events', 'Format: mwf 5pm-6pm description. Days: mwf, tth, su, sa, mon,wed, daily, weekdays, weekends. Times need am/pm: 5pm-6pm, 5-5:30pm, 9am-3. Color tag optional, like [green].'],
   ['bday', 'Birthdays', 'Format: mar 5 1990 name. The year is optional and shows an age. Color tag optional, like [purple].'],
-  ['task', 'Tasks', 'One per line: oct 20 buy milk. A due date is required. When you finish editing, [2026], [added ...] and (on checked lines) [done ...] tags are added for you and come back if removed. Start a line with ### to check it off.'],
   ['gen', 'General Tasks', 'One per line, no date needed: buy milk. [added ...] and [done ...] tags are added for you. Start a line with ### to check it off. Drag the handle on the Tasks page or dashboard to reorder.'],
-  ['rtask', 'Recurring Tasks', `One per line: mwf take vitamins, or 1st,15th pay rent for days of the month (last works too). Check them off on the Tasks page or dashboard. Completed days are saved on the line as [done ...], days that passed unchecked as [missed ...], and [since ...] marks when tracking began. These tags are managed for you.`],
-  ['hw', 'HW', 'One line per week: year:week:data, like 2026:42:[["math",{"mon":["ch 3 hw"],"wed":["### quiz"]}]]. Weeks run Monday to Sunday. The HW page edits these lines; ### marks an assignment done.'],
+  ['rtask', 'Recurring Tasks', `One per line: mwf take vitamins, or 1st,15th pay rent for days of the month (last works too). Check them off on the Tasks page or dashboard. Completed days are saved on the line as [done 10/14/26] and [since 10/5/26] marks when tracking began. These tags are managed for you.`],
+  ['hw', 'Tasks', 'One line per week: year:week:data, like 2026:42:[["math",{"mon":["ch 3 hw"],"wed":["### quiz"]}]]. Weeks run Monday to Sunday. The Tasks page edits these lines; ### marks a task done.'],
   ['habit', 'Habits', 'One habit per line with the days you did it: meditate | 2026-10-12, 2026-10-13.'],
   ['note', 'Notepad', 'Free text. The notepad on the dashboard edits this same box.'],
   ['quote', 'Quotes', 'One quote per line, with an optional author after a dash: "The only way out is through" - Robert Frost. Type the quotation marks yourself if you want them. The dashboard shows one each day.']
@@ -759,7 +757,7 @@ const dataP = () => `<div class="panel"><h2>Settings</h2><div class="sgrid">
   <div class="sset"><div class="sl">Look Ahead</div><label class="la2"><input type="number" min="1" max="365" value="${view.range}" data-la="1" aria-label="Look Ahead Days"><span>Days</span></label><div class="tag hint">How far Approaching Events and Approaching Tasks look.</div></div>
   <div class="sset"><div class="sl">Backup</div><button class="btn" data-a="backup">Download Backup</button><div class="tag hint">Saves every list as a file.</div></div></div>
   <p class="tag hint">Every list lives below and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${relayPanel()}<div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
-const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], tasks: ['task', 'rtask', 'gen']};
+const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], hw: ['rtask', 'gen']};
 const errBanner = tab => { const S = getSched(), own = PAGE_LISTS[tab] || [], n = LISTS.reduce((a, k) => a + (own.includes(k) ? 0 : S.errs[k].length), 0); return n ? `<div class="panel warn">${n} line${n > 1 ? 's' : ''} can't be read. Fix ${n > 1 ? 'them' : 'it'} on the <button class="link" data-a="tab" data-v="data">Settings</button> page.</div>` : ''; };
 
 /* ---------- events ---------- */
@@ -797,7 +795,7 @@ $app.addEventListener('click', e => {
   if (a === 'today') { view.cur = new Date(); return reCal(); }
   if (a === 'nav') { const k = +v; view.cur = view.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + k, 1) : new Date(c.getFullYear(), c.getMonth(), c.getDate() + k * (view.mode === 'week' ? 7 : 1)); return reCal(); }
   if (a === 'goday') { view.cur = new Date(v + 'T00:00'); view.mode = 'day'; return reCal(); }
-  if (a === 'rtog') lineOp('rtask', +v, l => rtToggle(l, b.dataset.d));
+  if (a === 'rtog') { lineOp('rtask', +v, l => rtToggle(l, b.dataset.d)); if (b.closest('table.hw')) { changed(true); b.classList.toggle('on'); const r = b.closest('.hl'); if (r) r.classList.toggle('hd'); return; } }
   if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[done [^\]]*\]/i, ''); return '### ' + l + ' [done ' + doneStamp(u) + ']'; });
   if (a === 'hwnav') { view.hw = new Date(view.hw.getFullYear(), view.hw.getMonth(), view.hw.getDate() + 7 * +v); return render(true); }
   if (a === 'hwnow') { view.hw = new Date(); return render(true); }
@@ -806,7 +804,7 @@ $app.addEventListener('click', e => {
   if (a === 'hwtog') {
     const tg = l => /^###/.test(l) ? l.replace(/^###\s*/, '') : '### ' + l, i = +b.dataset.i;
     if (b.dataset.wk) { const [y, w] = b.dataset.wk.split(':').map(Number), ci = +b.dataset.c, dk = b.dataset.d; hwEdit(y, w, cls => { cls[ci][1][dk][i] = tg(cls[ci][1][dk][i]); }); }
-    else hwMod(+b.dataset.c, b.dataset.d, b.dataset.pv === '1', it => it.map((l, j) => j === i ? tg(l) : l));
+    else { hwMod(+b.dataset.c, b.dataset.d, b.dataset.pv === '1', it => it.map((l, j) => j === i ? tg(l) : l), true); b.classList.toggle('on'); const r = b.closest('.hl'); if (r) r.classList.toggle('hd'); }
     return;
   }
   if (a === 'hwedit') {
@@ -860,7 +858,7 @@ $app.addEventListener('submit', e => {
 $app.addEventListener('input', e => {
   if (e.target.classList && e.target.classList.contains('pad')) fit(e.target);
   const k = e.target.dataset && e.target.dataset.k; if (!k) return;
-  state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal(); const vs = document.getElementById('vis'); if (vs) vs.innerHTML = view.tab === 'tasks' ? tasksVis() : habitVis();
+  state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal(); const vs = document.getElementById('vis'); if (vs) vs.innerHTML = view.tab === 'hw' ? hwVis() : habitVis();
   const x = document.getElementById('err-' + k); if (x) x.innerHTML = errHtml(k);
 });
 $app.addEventListener('change', e => {
@@ -881,14 +879,14 @@ $app.addEventListener('change', e => {
   else if (ds.hc != null) {
     const v = e.target.value.trim().toLowerCase(), {y, w} = hwWk(false), cls = hwGet(y, w);
     if (ds.hc === 'new') { if (!v) return; cls.push([v, {}]); }
-    else { const i = +ds.hc; if (!v) { if (Object.keys(cls[i][1]).length && !confirm('Delete this class and its assignments for this week?')) { render(true); return; } cls.splice(i, 1); } else cls[i][0] = v; }
+    else { const i = +ds.hc; if (!v) { if (Object.keys(cls[i][1]).length && !confirm('Delete this category and its tasks for this week?')) { render(true); return; } cls.splice(i, 1); } else cls[i][0] = v; }
     hwWrite(y, w, cls); changed();
   }
 });
 $app.addEventListener('focusout', e => {
   const t = e.target, ds = t.dataset || {}, bx = t.closest && t.closest('.addbox');
   if (bx) setTimeout(() => { if (!bx.contains(document.activeElement) && boxEmpty(bx)) bx.classList.remove('open'); }, 0);
-  if (ds.k === 'task' || ds.k === 'gen' || ds.k === 'once') {
+  if (ds.k === 'gen' || ds.k === 'once') {
     const nt = fixLines(ds.k, t.value); if (nt === t.value) return;
     t.value = nt; state.sched[ds.k] = {t: nt, u: now()}; changed(true);
     const x = document.getElementById('err-' + ds.k); if (x) x.innerHTML = errHtml(ds.k);
