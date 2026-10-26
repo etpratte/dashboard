@@ -188,6 +188,72 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .hl .chk.on::after{content:none}
 .hl.rec{color:var(--acc)}
 .row.rec .t{color:var(--acc)}
+/* ===== phone layout (up to 700px wide); desktop is untouched ===== */
+@media (max-width:700px){
+body{font-size:14px;padding-bottom:calc(70px + env(safe-area-inset-bottom));-webkit-tap-highlight-color:transparent}
+button,.day,.chk,.hc,.tab{touch-action:manipulation}
+.wrap{padding:8px 10px 18px}
+header{flex-wrap:nowrap;gap:8px;margin-bottom:10px;align-items:center}
+.ttl{flex:1;min-width:0;flex-direction:column;flex-wrap:nowrap;align-items:flex-start;gap:0}
+.ttl h1{font-size:16px;line-height:1.2;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt{font-size:12px;line-height:1.3}
+.sync{flex:none;margin-left:0;font-size:11px;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.sync .btn{padding:4px 10px;font-size:12px}
+.gate{margin:8vh auto}.gate h1{font-size:26px}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;margin:0;gap:2px;overflow:visible;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
+.tab{flex:1 1 0;min-width:0;padding:9px 0;font-size:11.5px;text-align:center;border-radius:10px}
+.tab.on{background:var(--accsoft);color:var(--acc)}
+.wrap:has(input:focus,textarea:focus,select:focus) .tabs{display:none}
+#toast{bottom:calc(76px + env(safe-area-inset-bottom));max-width:90vw;text-align:center}
+h2{font-size:17px;margin-bottom:8px}
+.panel{padding:12px;border-radius:12px}
+.panel+.panel,.panel+details{margin-top:12px}.cols2+.panel,.cols3+.panel,.cols2+.cols3{margin-top:12px}
+.dcols,.cols2,.cols3{gap:12px}#vis,#calwrap{margin-bottom:12px}.mcols{margin-top:12px}.mcols>.panel{margin-bottom:12px}
+.qbox{padding:8px 12px}
+.row{padding:9px 0}
+.row .due{max-width:42%;text-align:right;font-size:11px}
+.chk{width:24px;height:24px}
+.btn{padding:9px 16px}
+.tb{gap:6px;margin-bottom:8px}
+.tb h2{flex:1 1 auto!important;min-width:0}.tb:has(.seg) h2{flex-basis:100%!important}
+.rng{display:block;margin:0;font-size:12px}
+.tb .seg{flex:1}.tb .seg button{flex:1;padding:7px 0}
+.navs{margin-left:auto}.nb{height:36px}
+input[type=text],input[type=number],input[type=date],input[type=time],input:not([type]),select,textarea{font-size:16px}
+textarea.code{font-size:12px}
+.hcin{letter-spacing:.03em}
+.grid{gap:1px}.day{min-height:44px;padding:3px 0}.day.today>span:first-child{width:22px;height:22px}
+.dayview{margin-top:12px;padding-top:10px}
+.tg.wide{min-width:470px}
+.tgr{grid-template-columns:34px repeat(var(--n),minmax(0,1fr))}
+.tgut span{right:3px;font-size:10px}
+.tgd{font-size:12px;padding:5px 0}
+table.hw:not(.hab),table.hw:not(.hab) tbody{display:block;width:100%;min-width:0}
+table.hw:not(.hab) thead{display:none}
+table.hw:not(.hab) tr{display:block;background:var(--bg);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+table.hw:not(.hab) td{display:block;width:auto;border:0;padding:0}
+table.hw:not(.hab) td.hcn{background:var(--accsoft);padding:4px 8px}
+table.hw:not(.hab) td:not(.hcn){display:grid;grid-template-columns:58px minmax(0,1fr);border-top:1px solid var(--line)}
+table.hw:not(.hab) td:not(.hcn)::before{content:attr(data-day);padding:9px 0 0 10px;font-size:12px;color:var(--mute);white-space:nowrap}
+table.hw:not(.hab) td.tdy::before{color:var(--acc);font-weight:600}
+.hw td .hc{min-height:38px;padding:6px 8px 4px 0}
+.hw td .hc:empty::after{content:"+";color:var(--line);font-size:16px}
+.hl{font-size:14px;padding:3px 4px}
+.hl .chk{width:20px;height:20px;min-width:20px;margin-top:1px}
+.hl .chk.on{background-size:12px 12px}
+table.hw:not(.hab) tr.addrow{background:none;border:0;border-radius:0;overflow:visible;margin-bottom:0}
+table.hw:not(.hab) tr.addrow td.hcn{background:none;padding:0}
+table.hw:not(.hab) tr.addrow td:not(.hcn){display:none}
+.hw .addrow .hcin{border:1px dashed var(--line);padding:9px 10px;border-radius:10px}
+table.hw.hab{min-width:0;table-layout:fixed}
+.hab th:first-child,.hab td.hcn{width:36%}
+.hab th{padding:4px 0;font-size:11px;line-height:1.15}
+.hw.hab td{padding:3px 0}
+.hab .hrow{flex-direction:column;align-items:flex-start;gap:0}
+.hab .hstk{padding-left:4px}
+.hab .hbc .chk{margin:3px auto}
+.hw.hab tr.addrow td:not(.hcn){display:none}
+}
 </style>
 </head>
 <body>
@@ -462,17 +528,15 @@ function hwRec(d, x, done) {
     (c[1][dk] = c[1][dk] || []).push((done ? '### ' : '') + x.t);
   });
 }
-function rtTog(i, ds) {
+function rtTog(i, ds, quiet) {
   const x = getSched().rtask.find(r => r.i === i), d = new Date(ds + 'T00:00'); if (!x || isNaN(d)) return;
   const {y, w} = isoWeek(d), dk = HWD[(d.getDay() + 6) % 7];
-  let nowDone = false;
   hwPut(y, w, cls => {
     let c = cls.find(q => q[0].toLowerCase() === x.cat); if (!c) { c = [x.cat, {}]; cls.push(c); }
     const a = c[1][dk] = c[1][dk] || [], j = a.findIndex(l => cleanL(l) === x.t.toLowerCase());
-    if (j < 0) { a.push('### ' + x.t); nowDone = true; } else if (/^###/.test(a[j])) a[j] = a[j].replace(/^###\s*/, ''); else { a[j] = '### ' + a[j]; nowDone = true; }
+    if (j < 0) a.push('### ' + x.t); else a[j] = /^###/.test(a[j]) ? a[j].replace(/^###\s*/, '') : '### ' + a[j];
   });
-  if (nowDone) lingerSet(lingerKey(y, w, x.cat, dk, x.t));
-  changed();
+  changed(quiet);
 }
 function stampRecurring() {
   let ch = false;
@@ -631,6 +695,12 @@ function streak(h) { const d = new Date(); let n = 0; if (!h.days[ymd(d)]) d.set
 /* ---------- render ---------- */
 const TABS = [['home', 'Dashboard'], ['sched', 'Schedule'], ['hw', 'Tasks'], ['habit', 'Habits'], ['data', 'Settings']];
 const statusText = () => ({synced: 'Synced', syncing: 'Syncing\u2026', saving: 'Saving\u2026', error: 'Sync Failed, Will Retry', offline: 'Not Synced'}[status]);
+const SCROLLERS = '.tabs,.hww,.tgw';
+const snapScroll = () => [...$app.querySelectorAll(SCROLLERS)].map(el => [el.scrollLeft, el.scrollTop]);
+const applyScroll = snap => [...$app.querySelectorAll(SCROLLERS)].forEach((el, i) => { if (snap[i]) { el.scrollLeft = snap[i][0]; el.scrollTop = snap[i][1]; } });
+const keepScroll = fn => { const s = snapScroll(); fn(); applyScroll(s); };
+const isPhone = () => !!(window.matchMedia && window.matchMedia('(max-width:700px)').matches);
+let renderedTab = null;
 function render(force) {
   if (!signedIn && !known()) {
     $app.innerHTML = `<div class="gate"><h1>Big Guy Life Dashboard</h1><p class="empty">Sign In With Google to load your data from your own Drive. Nothing is stored anywhere else.</p><button class="btn" data-a="signin">Sign In With Google</button></div>`;
@@ -641,11 +711,14 @@ function render(force) {
   $app.classList.toggle('showhelp', !!view.help);
   $app.style.maxWidth = view.tab === 'home' ? '1256px' : '';
   saveDrafts();
+  const snap = snapScroll(), sameTab = renderedTab === view.tab, sy = window.scrollY;
   $app.innerHTML = `<header><div class="ttl"><h1>Big Guy Life Dashboard</h1><span class="dt">${d.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'})}</span></div>
   <div class="sync"><span id="sync">${statusText()}</span> ${signedIn ? '' : '<button class="btn" data-a="signin">Sign In To Sync</button>'}</div></header>
   <nav class="tabs">${TABS.map(([k, n]) => `<button class="tab${view.tab === k ? ' on' : ''}" data-a="tab" data-v="${k}">${n}</button>`).join('')}</nav>
   ${view.tab === 'data' ? '' : errBanner(view.tab)}${({home: homeP, sched: schedP, hw: hwP, habit: habitP, data: dataP})[view.tab]()}`;
   restoreDrafts();
+  if (sameTab) { applyScroll(snap); window.scrollTo(window.scrollX, sy); } else if (isPhone()) window.scrollTo(0, 0);
+  renderedTab = view.tab;
   $app.querySelectorAll('textarea.pad').forEach(fit);
   if (view.rf) { const el = $app.querySelector(`[name="${view.rf}"]`); view.rf = null; if (el) el.focus(); }
 }
@@ -654,8 +727,6 @@ const LKEY = 'dash-linger';
 const lingerMap = () => { try { return JSON.parse(localStorage.getItem(LKEY)) || {}; } catch (e) { return {}; } };
 const lingerSet = key => { const m = lingerMap(), n = now(); Object.keys(m).forEach(k => { if (n - m[k] > 864e5) delete m[k]; }); m[key] = n; try { localStorage.setItem(LKEY, JSON.stringify(m)); } catch (e) {} };
 const lingers = key => { const v = lingerMap()[key]; return !!v && now() - v < 864e5; };
-const lingerKey = (y, w, cat, dk, text) => y + ':' + w + ':' + String(cat).toLowerCase() + ':' + dk + ':' + cleanL(text);
-const itemKey = x => x.wk + ':' + String(x.n).toLowerCase() + ':' + x.dk + ':' + cleanL(x.l);
 const recent = x => x.k && x.done && (x.done >= todayStart() || lingers('g:' + x.t.toLowerCase()));
 const wd2 = d => d.toLocaleDateString(undefined, {weekday: 'short'}) + ' ' + d.getDate();
 const wd = d => d.toLocaleDateString(undefined, {weekday: 'short'}) + ' ' + fmtD(d);
@@ -669,19 +740,13 @@ const rtOn = (x, d) => x.days.has(d.getDay()) || x.dom.has(d.getDate()) || (x.do
 function homeP() {
   const t = new Date(), S = getSched(), R = view.range, day = i => new Date(t.getFullYear(), t.getMonth(), t.getDate() + i), ts = ymd(t);
   const up = []; for (let i = 1; i <= R; i++) eventsOn(day(i), false).forEach(e => up.push([day(i), e]));
-  const gen = S.gen.filter(x => !x.k || recent(x)), rt = rtVirt(t), hw = hwItems(t), apT = [];
-  for (let i = 1; i <= R; i++) {
-    const d = day(i);
-    hwItems(d).filter(x => !/^###/.test(x.l) || lingers(itemKey(x))).forEach(x => apT.push({ts: d.getTime(), h: hwRow(x, d)}));
-    rtVirt(d).forEach(x => apT.push({ts: d.getTime() + 1, h: rtApp(x, d)}));
-  }
+  const gen = S.gen.filter(x => !x.k || recent(x)), rt = rtVirt(t), hw = hwItems(t);
   const none = m => `<div class="empty">${m}</div>`, q = quoteOfDay();
   return `<div class="dcols"><div class="dcol">
   <div class="panel o1"><h2>Today</h2>${agenda(t, true, true)}</div>
   <div class="panel o3"><h2>Approaching Events</h2>${up.map(([d, e]) => `<div class="row ev"><span class="sw" style="${evSt(e)}"></span><span class="time">${wd2(d)}${e.s != null ? ' \u00B7 ' + fmtRange(e.s, e.e) : ''}</span><span class="t">${esc(e.t)}</span></div>`).join('') || none('Nothing Approaching.')}</div></div>
   <div class="dcol">
   <div class="panel o2"><h2>Tasks Today</h2>${hw.map(x => hwRow(x)).join('')}${rt.map(x => rtRow(x, ts)).join('')}${hw.length + rt.length ? '' : none('Nothing Due Today.')}</div>
-  <div class="panel o4"><h2>Approaching Tasks</h2>${apT.sort((a, b) => a.ts - b.ts).map(x => x.h).join('') || none('Nothing Due Soon.')}</div>
   <div class="panel o5"><h2>General Tasks</h2>${gen.map(x => taskRow(x, 'gen')).join('') || none('No General Tasks.')}</div></div>
   <div class="dcol">
   <div class="panel qbox o0">${q ? `<div class="qq">${esc(q.q)}</div>${q.a ? `<div class="qa">\u2014 ${esc(q.a)}</div>` : ''}` : '<div class="qa">Add quotes on the Settings page.</div>'}</div>
@@ -689,18 +754,20 @@ function homeP() {
 }
 
 const cellDate = (k, pv) => { const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()); return new Date(st.getFullYear(), st.getMonth(), st.getDate() + (pv ? 0 : HWD.indexOf(k) + 1)); };
-const hwLines = (items, ci, dk, pv) => { const {y, w} = hwWk(false), c = hwGet(y, w)[ci], cat = c ? c[0] : ''; return items.map((l, i) => { const dn = /^###/.test(l); return `<div class="hl${recOf(cat, l) ? ' rec' : ''}${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(l.replace(/^###\s*/, ''))}</span></div>`; }).join('') || ''; };
+const hwLine = (l, i, ci, dk, pv, rc) => { const dn = /^###/.test(l); return `<div class="hl${rc ? ' rec' : ''}${dn ? ' hd' : ''}"><button class="chk${dn ? ' on' : ''}" data-a="hwtog" data-c="${ci}" data-d="${dk}" data-pv="${pv ? 1 : 0}" data-i="${i}" aria-label="Toggle Done"></button><span>${esc(l.replace(/^###\s*/, ''))}</span></div>`; };
 function hwCell(ci, k, pv) {
-  const {y, w} = hwWk(false), c = hwGet(y, w)[ci], cat = c ? c[0].toLowerCase() : '', d = cellDate(k, pv), ds = ymd(d);
-  const virt = rtVirt(d).filter(x => x.cat === cat).map(x => `<div class="hl rec"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="Toggle Done"></button><span>${esc(x.t)}</span></div>`).join('');
-  return hwLines(hwCellItems(ci, k, pv), ci, k, pv) + virt;
+  const {y, w} = hwWk(false), c = hwGet(y, w)[ci], cat = c ? c[0].toLowerCase() : '', d = cellDate(k, pv), ds = ymd(d), R = getSched().rtask, plain = [], rec = [];
+  hwCellItems(ci, k, pv).forEach((l, i) => { const ri = R.findIndex(r => r.cat === cat && r.t.toLowerCase() === cleanL(l)); (ri < 0 ? plain : rec).push({ri, h: hwLine(l, i, ci, k, pv, ri >= 0)}); });
+  rtVirt(d).filter(x => x.cat === cat).forEach(x => rec.push({ri: R.indexOf(x), h: `<div class="hl rec"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="Toggle Done"></button><span>${esc(x.t)}</span></div>`}));
+  rec.sort((a, b) => a.ri - b.ri);
+  return plain.concat(rec).map(e => e.h).join('');
 }
 function hwSheet() {
   const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i);
   const {y, w} = hwWk(false), cls = hwGet(y, w), td = todayStr(), S = getSched();
   const days = [{k: 'sun', d: at(0), pv: true}, ...HWD.slice(0, 6).map((k, i) => ({k, d: at(i + 1), pv: false}))];
   return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="hwnow">Now</button><button class="ghost nb arr" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
-  <div class="hww"><table class="hw"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwCell(ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
+  <div class="hww"><table class="hw"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}" data-day="${cap(x.k)} ${x.d.getDate()}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwCell(ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
   <p class="tag hint">Click a cell to type tasks, one per line. Click a circle to mark one done. Edit a category name in the first column; clear it to remove the category from this week onward (only when its row is empty). Recurring tasks appear in light blue inside their category and are edited in the Recurring Tasks list below.</p></div>`;
 }
 
@@ -769,7 +836,6 @@ function taskRow(x, l, compact) {
 const ordS = n => n === -1 ? 'Last' : n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);
 const rtLabel = x => [x.days.size === 7 ? 'Daily' : [1, 2, 3, 4, 5, 6, 0].filter(i => x.days.has(i)).map(i => cap(DAYN[i])).join(' '), [...x.dom].sort((a, b) => a - b).map(ordS).join(' ')].filter(Boolean).join(' \u00B7 ') + (x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : '');
 const rtRow = (x, d) => { const dn = d && rtDone(x, d); return `<div class="row rec${dn ? ' done' : ''}">${d ? `<button class="chk" data-a="rtog" data-v="${x.i}" data-d="${d}" aria-label="${dn ? 'Uncheck' : 'Check'}"></button>` : ''}<span class="t">${esc(x.cat.toUpperCase())}: ${esc(x.t)}</span><span class="due">${rtLabel(x)}</span></div>`; };
-const rtApp = (x, d) => { const ds = ymd(d); return `<div class="row rec"><button class="chk" data-a="rtog" data-v="${x.i}" data-d="${ds}" aria-label="Check"></button><span class="t">${esc(x.cat.toUpperCase())}: ${esc(x.t)}</span><span class="due">${wd(d)}${x.s != null ? ' \u00B7 ' + fmtRange(x.s, x.e) : ''}</span></div>`; };
 const genPanel = S => `<div class="panel"><h2>General Tasks</h2>${S.gen.filter(x => !x.k || recent(x)).map(x => taskRow(x, 'gen')).join('') || '<div class="empty">No General Tasks.</div>'}<div class="addbox" data-ab="gen"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="gen"><input type="text" class="desc" name="t" placeholder="Task" required><button class="btn">Add</button></form></div></div>`;
 const recPanel = S => { const wk = hwWk(false), cn = hwGet(wk.y, wk.w).map(c => c[0]), td = new Date(); return `<div class="panel"><h2>Recurring Tasks</h2>${S.rtask.map(x => rtRow(x, rtOn(x, td) ? todayStr() : '')).join('') || '<div class="empty">No Recurring Tasks.</div>'}<div class="addbox" data-ab="rtask"><button class="btn" type="button" data-a="addopen">+ Add</button><form data-f="rtask"><input type="text" class="desc" name="t" placeholder="Task" required><input type="text" class="dm" name="cat" list="rcats" placeholder="Category" autocomplete="off" required><datalist id="rcats">${cn.map(n => `<option value="${esc(n)}">`).join('')}</datalist><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div><input type="text" class="dm" name="dm" placeholder="Day Of Month"><button class="btn">Add</button></form></div><p class="tag hint">Each recurring task belongs to a category and shows in that category's row on the sheet, in light blue. Check the circle to complete that day's instance.</p></div>`; };
 const hwVis = () => { const S = getSched(); return hwSheet() + `<div class="cols2" style="margin-top:16px">${genPanel(S)}${recPanel(S)}</div>`; };
@@ -821,7 +887,7 @@ function relayPanel() {
 }
 const dataP = () => `<div class="panel"><h2>Settings</h2><div class="sgrid">
   <div class="sset"><div class="sl">Show Instructions</div><label class="tgl"><input type="checkbox" data-hlp="1"${view.help ? ' checked' : ''}><span class="knob"></span></label><div class="tag hint">Shows the small gray help text under each list.</div></div>
-  <div class="sset"><div class="sl">Look Ahead</div><label class="la2"><input type="number" min="1" max="365" value="${view.range}" data-la="1" aria-label="Look Ahead Days"><span>Days</span></label><div class="tag hint">How far Approaching Events and Approaching Tasks look.</div></div>
+  <div class="sset"><div class="sl">Look Ahead</div><label class="la2"><input type="number" min="1" max="365" value="${view.range}" data-la="1" aria-label="Look Ahead Days"><span>Days</span></label><div class="tag hint">How far Approaching Events look.</div></div>
   <div class="sset"><div class="sl">Backup</div><button class="btn" data-a="backup">Download Backup</button><div class="tag hint">Saves every list as a file.</div></div></div>
   <p class="tag hint">Every list lives below and nothing else holds data. The other pages only read these lists. Edits save automatically.</p></div>${relayPanel()}<div class="mcols">${LIST_META.map(([k, t, h]) => editor(k, t, h, '')).join('')}</div>`;
 const PAGE_LISTS = {sched: ['once', 'rec', 'bday'], hw: ['rtask', 'gen']};
@@ -845,7 +911,7 @@ function restoreDrafts() {
 }
 const boxEmpty = box => ![...box.querySelectorAll('input')].some(i => i.type === 'checkbox' ? i.checked : i.value);
 const fit = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; };
-const reCal = () => { const w = document.getElementById('calwrap'); if (w) w.innerHTML = calHtml(); };
+const reCal = () => { const w = document.getElementById('calwrap'); if (w) keepScroll(() => { w.innerHTML = calHtml(); }); };
 $app.addEventListener('click', e => {
   const b = e.target.closest('[data-a]'); if (!b) return;
   const a = b.dataset.a, v = b.dataset.v, u = now(), c = view.cur;
@@ -862,7 +928,7 @@ $app.addEventListener('click', e => {
   if (a === 'today') { view.cur = new Date(); return reCal(); }
   if (a === 'nav') { const k = +v; view.cur = view.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + k, 1) : new Date(c.getFullYear(), c.getMonth(), c.getDate() + k * (view.mode === 'week' ? 7 : 1)); return reCal(); }
   if (a === 'goday') { view.cur = new Date(v + 'T00:00'); view.mode = 'day'; return reCal(); }
-  if (a === 'rtog') return rtTog(+v, b.dataset.d);
+  if (a === 'rtog') { const vs = document.getElementById('vis'); if (vs && view.tab === 'hw') { rtTog(+v, b.dataset.d, true); keepScroll(() => { vs.innerHTML = hwVis(); }); return; } return rtTog(+v, b.dataset.d); }
   if (a === 'tog') lineOp(b.dataset.l, +v, l => { l = l.trim(); if (!/^###/.test(l)) { const g = pGen(l); if (g) lingerSet('g:' + g.t.toLowerCase()); } if (/^###/.test(l)) return l.replace(/^###\s*/, '').replace(/\s*\[(?:done|completed) [^\]]*\]/i, ''); return '### ' + l + ' [completed ' + doneStamp(u) + ']'; });
   if (a === 'hwnav') { view.hw = new Date(view.hw.getFullYear(), view.hw.getMonth(), view.hw.getDate() + 7 * +v); return render(true); }
   if (a === 'hwnow') { view.hw = new Date(); return render(true); }
@@ -870,8 +936,8 @@ $app.addEventListener('click', e => {
   if (a === 'habnow') { view.hab = new Date(); return render(true); }
   if (a === 'hwtog') {
     const tg = l => /^###/.test(l) ? l.replace(/^###\s*/, '') : '### ' + l, i = +b.dataset.i;
-    if (b.dataset.wk) { const [y, w] = b.dataset.wk.split(':').map(Number), ci = +b.dataset.c, dk = b.dataset.d; hwEdit(y, w, cls => { const l0 = cls[ci][1][dk][i]; if (!/^###/.test(l0)) lingerSet(lingerKey(y, w, cls[ci][0], dk, l0)); cls[ci][1][dk][i] = tg(l0); }); }
-    else { const pw = hwWk(b.dataset.pv === '1'), cat0 = hwCatName(+b.dataset.c); hwMod(+b.dataset.c, b.dataset.d, b.dataset.pv === '1', it => it.map((l, j) => { if (j === i && !/^###/.test(l)) lingerSet(lingerKey(pw.y, pw.w, cat0, b.dataset.d, l)); return j === i ? tg(l) : l; }), true); b.classList.toggle('on'); const r = b.closest('.hl'); if (r) r.classList.toggle('hd'); }
+    if (b.dataset.wk) { const [y, w] = b.dataset.wk.split(':').map(Number), ci = +b.dataset.c, dk = b.dataset.d; hwEdit(y, w, cls => { cls[ci][1][dk][i] = tg(cls[ci][1][dk][i]); }); }
+    else { hwMod(+b.dataset.c, b.dataset.d, b.dataset.pv === '1', it => it.map((l, j) => j === i ? tg(l) : l), true); b.classList.toggle('on'); const r = b.closest('.hl'); if (r) r.classList.toggle('hd'); }
     return;
   }
   if (a === 'hwedit') {
@@ -926,7 +992,7 @@ $app.addEventListener('submit', e => {
 $app.addEventListener('input', e => {
   if (e.target.classList && e.target.classList.contains('pad')) fit(e.target);
   const k = e.target.dataset && e.target.dataset.k; if (!k) return;
-  state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal(); const vs = document.getElementById('vis'); if (vs) vs.innerHTML = view.tab === 'hw' ? hwVis() : habitVis();
+  state.sched[k] = {t: e.target.value, u: now()}; changed(true); reCal(); const vs = document.getElementById('vis'); if (vs) keepScroll(() => { vs.innerHTML = view.tab === 'hw' ? hwVis() : habitVis(); });
   const x = document.getElementById('err-' + k); if (x) x.innerHTML = errHtml(k);
 });
 $app.addEventListener('change', e => {
