@@ -228,19 +228,35 @@ textarea.code{font-size:12px}
 .tgr{grid-template-columns:34px repeat(var(--n),minmax(0,1fr))}
 .tgut span{right:3px;font-size:10px}
 .tgd{font-size:12px;padding:5px 0}
-table.hw:not(.hab){min-width:770px}
-table.hw:not(.hab) th:first-child,table.hw:not(.hab) td.hcn{width:96px;position:sticky;left:0;z-index:2;background:var(--panel);box-shadow:inset -1px 0 var(--line)}
+table.hw:not(.hab){min-width:calc(var(--fw,64px) + 7 * 80px)}
+table.hw:not(.hab) th:first-child,table.hw:not(.hab) td.hcn{width:var(--fw,64px)}
+.hw:not(.hab) th{font-size:11px;padding:4px 2px}
+.hw:not(.hab) td{padding:3px}
+.hw:not(.hab) .hcin{padding:4px 2px}
+.hw:not(.hab) .hl{font-size:12px;padding:1px 2px;gap:4px;margin-bottom:1px}
 .hwt{font-size:16px}
-.hl .chk{width:18px;height:18px;min-width:18px}
-.hl .chk.on{background-size:11px 11px}
+table.hw:not(.hab) tr.addrow td.hcn{overflow:visible}
+table.hw:not(.hab) tr.addrow .hcin{width:150px}
 table.hw.hab{min-width:0;table-layout:fixed}
-.hab th:first-child,.hab td.hcn{width:88px}
+.hab th:first-child,.hab td.hcn{width:var(--fw,88px)}
+.hab td.hcn{overflow:hidden}
 .hab th{padding:4px 0;font-size:11px;line-height:1.15}
 .hw.hab td{padding:3px 0}
-.hab .hrow{flex-direction:column;align-items:flex-start;gap:0}
+.hab .hrow{flex-direction:column;align-items:stretch;gap:0}
+.hab .hrow .hcin{flex:none;width:100%;min-width:0;text-overflow:ellipsis}
 .hab .hstk{padding-left:4px}
 .hab .hbc .chk{margin:3px auto}
-.hw.hab tr.addrow td:not(.hcn){display:none}
+.hab tr.addrow td.hcn{overflow:visible}
+.hab tr.addrow .hcin{width:150px}
+.dcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start}
+.dcol:nth-child(1),.dcol:nth-child(2){display:flex;flex-direction:column;gap:10px;min-width:0;order:1}
+.dcol:nth-child(3){display:contents}
+.dcol:nth-child(3)>.panel{grid-column:1/-1}
+.dcols .panel{padding:10px}
+.dcols h2{font-size:15px;margin-bottom:6px}
+.dcols .row{flex-wrap:wrap;gap:2px 8px;padding:7px 0}
+.dcols .row .t{flex:1 1 70px}
+.dcols .row .due{flex:1 1 100%;max-width:none;text-align:left}
 }
 </style>
 </head>
@@ -750,12 +766,13 @@ function hwCell(ci, k, pv) {
   rec.sort((a, b) => a.ri - b.ri);
   return plain.concat(rec).map(e => e.h).join('');
 }
+const colW = (names, em, lo, hi) => Math.max(lo, Math.min(hi, Math.ceil(Math.max(0, ...names.map(n => n.length)) * em + 14)));
 function hwSheet() {
   const c = view.hw, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i);
   const {y, w} = hwWk(false), cls = hwGet(y, w), td = todayStr(), S = getSched();
   const days = [{k: 'sun', d: at(0), pv: true}, ...HWD.slice(0, 6).map((k, i) => ({k, d: at(i + 1), pv: false}))];
   return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="hwnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="hwnow">Now</button><button class="ghost nb arr" data-a="hwnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
-  <div class="hww"><table class="hw"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}" data-day="${cap(x.k)} ${x.d.getDate()}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwCell(ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
+  <div class="hww"><table class="hw" style="--fw:${colW(cls.map(([n]) => n), 11, 56, 130)}px"><thead><tr><th>Category</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${cls.map(([n], ci) => `<tr><td class="hcn"><input class="hcin" data-hc="${ci}" value="${esc(n.toUpperCase())}" aria-label="Category Name"></td>${days.map(x => `<td class="${ymd(x.d) === td ? 'tdy' : ''}" data-day="${cap(x.k)} ${x.d.getDate()}"><div class="hc" data-a="hwedit" data-c="${ci}" data-d="${x.k}" data-pv="${x.pv ? 1 : 0}">${hwCell(ci, x.k, x.pv)}</div></td>`).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hc="new" placeholder="Add Category" aria-label="Add Category"></td><td colspan="7"></td></tr></tbody></table></div>
   <p class="tag hint">Click a cell to type tasks, one per line. Click a circle to mark one done. Edit a category name in the first column; clear it to remove the category from this week onward (only when its row is empty). Recurring tasks appear in light blue inside their category and are edited in the Recurring Tasks list below.</p></div>`;
 }
 
@@ -832,7 +849,7 @@ function habitVis() {
   const c = view.hab, st = new Date(c.getFullYear(), c.getMonth(), c.getDate() - c.getDay()), at = i => new Date(st.getFullYear(), st.getMonth(), st.getDate() + i), td = todayStr();
   const days = [...Array(7)].map((_, i) => ({k: HWD[(i + 6) % 7], d: at(i)})), h = getSched().habit;
   return `<div class="panel"><div class="tb"><h2 style="margin:0;flex:1">${weekTitle(st)}</h2><span class="navs"><button class="ghost nb arr" data-a="habnav" data-v="-1" aria-label="Previous Week">\u2039</button><button class="ghost nb" data-a="habnow">Now</button><button class="ghost nb arr" data-a="habnav" data-v="1" aria-label="Next Week">\u203A</button></span></div>
-  <div class="hww"><table class="hw hab"><thead><tr><th>Habit</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${h.map(x => `<tr><td class="hcn"><div class="hrow"><input class="hcin nc" data-hbn="${x.i}" value="${esc(nice(x.name))}" aria-label="Habit Name">${streakHtml(x)}</div></td>${days.map(dd => { const s = ymd(dd.d); return `<td class="hbc${s === td ? ' tdy' : ''}"><button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button></td>`; }).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hbn="new" placeholder="Add Habit" aria-label="Add Habit"></td><td colspan="7"></td></tr></tbody></table></div></div>`;
+  <div class="hww"><table class="hw hab" style="--fw:${colW(h.map(x => nice(x.name)), 8.6, 60, 140)}px"><thead><tr><th>Habit</th>${days.map(x => `<th class="${ymd(x.d) === td ? 'today' : ''}">${cap(x.k)} ${x.d.getDate()}</th>`).join('')}</tr></thead><tbody>${h.map(x => `<tr><td class="hcn"><div class="hrow"><input class="hcin nc" data-hbn="${x.i}" value="${esc(nice(x.name))}" aria-label="Habit Name">${streakHtml(x)}</div></td>${days.map(dd => { const s = ymd(dd.d); return `<td class="hbc${s === td ? ' tdy' : ''}"><button class="chk${x.days[s] ? ' on' : ''}" data-a="hab" data-v="${x.i}" data-d="${s}" aria-label="${s}"></button></td>`; }).join('')}</tr>`).join('')}<tr class="addrow"><td class="hcn"><input class="hcin nc" data-hbn="new" placeholder="Add Habit" aria-label="Add Habit"></td><td colspan="7"></td></tr></tbody></table></div></div>`;
 }
 const habitP = () => `<div id="vis">${habitVis()}</div>`;
 
