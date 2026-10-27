@@ -228,25 +228,13 @@ textarea.code{font-size:12px}
 .tgr{grid-template-columns:34px repeat(var(--n),minmax(0,1fr))}
 .tgut span{right:3px;font-size:10px}
 .tgd{font-size:12px;padding:5px 0}
-table.hw:not(.hab),table.hw:not(.hab) tbody{display:block;width:100%;min-width:0}
-table.hw:not(.hab) thead{display:none}
-table.hw:not(.hab) tr{display:block;background:var(--bg);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
-table.hw:not(.hab) td{display:block;width:auto;border:0;padding:0}
-table.hw:not(.hab) td.hcn{background:var(--accsoft);padding:4px 8px}
-table.hw:not(.hab) td:not(.hcn){display:grid;grid-template-columns:58px minmax(0,1fr);border-top:1px solid var(--line)}
-table.hw:not(.hab) td:not(.hcn)::before{content:attr(data-day);padding:9px 0 0 10px;font-size:12px;color:var(--mute);white-space:nowrap}
-table.hw:not(.hab) td.tdy::before{color:var(--acc);font-weight:600}
-.hw td .hc{min-height:38px;padding:6px 8px 4px 0}
-.hw td .hc:empty::after{content:"+";color:var(--line);font-size:16px}
-.hl{font-size:14px;padding:3px 4px}
-.hl .chk{width:20px;height:20px;min-width:20px;margin-top:1px}
-.hl .chk.on{background-size:12px 12px}
-table.hw:not(.hab) tr.addrow{background:none;border:0;border-radius:0;overflow:visible;margin-bottom:0}
-table.hw:not(.hab) tr.addrow td.hcn{background:none;padding:0}
-table.hw:not(.hab) tr.addrow td:not(.hcn){display:none}
-.hw .addrow .hcin{border:1px dashed var(--line);padding:9px 10px;border-radius:10px}
+table.hw:not(.hab){min-width:770px}
+table.hw:not(.hab) th:first-child,table.hw:not(.hab) td.hcn{width:96px;position:sticky;left:0;z-index:2;background:var(--panel);box-shadow:inset -1px 0 var(--line)}
+.hwt{font-size:16px}
+.hl .chk{width:18px;height:18px;min-width:18px}
+.hl .chk.on{background-size:11px 11px}
 table.hw.hab{min-width:0;table-layout:fixed}
-.hab th:first-child,.hab td.hcn{width:36%}
+.hab th:first-child,.hab td.hcn{width:88px}
 .hab th{padding:4px 0;font-size:11px;line-height:1.15}
 .hw.hab td{padding:3px 0}
 .hab .hrow{flex-direction:column;align-items:flex-start;gap:0}
