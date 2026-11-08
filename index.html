@@ -188,6 +188,11 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .hl .chk.on::after{content:none}
 .hl.rec{color:var(--acc)}
 .row.rec .t{color:var(--acc)}
+.tbt{flex:1;display:flex;align-items:center;gap:10px;min-width:0}
+.tbt h2{margin:0}
+.tbt .btn{padding:5px 12px;font-size:13px;flex:none}
+form.qa{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+form.qa input[type=text]{flex:1 1 240px;min-width:0}
 /* ===== phone layout (up to 700px wide); desktop is untouched ===== */
 @media (max-width:700px){
 body{font-size:14px;padding-bottom:calc(70px + env(safe-area-inset-bottom));-webkit-tap-highlight-color:transparent}
@@ -257,6 +262,8 @@ table.hw.hab{min-width:0;table-layout:fixed}
 .dcols .row{flex-wrap:wrap;gap:2px 8px;padding:7px 0}
 .dcols .row .t{flex:1 1 70px}
 .dcols .row .due{flex:1 1 100%;max-width:none;text-align:left}
+.tb:has(.seg) .tbt{flex:1 1 100%}
+.tb .tbt h2{flex:0 1 auto!important}.tb:has(.seg) .tbt h2{flex-basis:auto!important}
 }
 </style>
 </head>
@@ -812,8 +819,9 @@ function calHtml() {
     title = weekTitle(s);
     body = gridHtml([...Array(7)].map((_, i) => new Date(s.getFullYear(), s.getMonth(), s.getDate() + i)));
   } else { title = fmtL(c); body = gridHtml([c]); }
-  return `<div class="tb"><h2 style="margin:0;flex:1">${title}</h2><span class="seg">${['month', 'week', 'day'].map(x => `<button class="${m === x ? 'on' : ''}" data-a="mode" data-v="${x}">${cap(x)}</button>`).join('')}</span><span class="navs"><button class="ghost nb arr" data-a="nav" data-v="-1" aria-label="Previous">\u2039</button><button class="ghost nb" data-a="today">Now</button><button class="ghost nb arr" data-a="nav" data-v="1" aria-label="Next">\u203A</button></span></div>${body}`;
+  return `<div class="tb"><span class="tbt"><h2>${title}</h2><button class="btn" type="button" data-a="qaopen">+ Add</button></span><span class="seg">${['month', 'week', 'day'].map(x => `<button class="${m === x ? 'on' : ''}" data-a="mode" data-v="${x}">${cap(x)}</button>`).join('')}</span><span class="navs"><button class="ghost nb arr" data-a="nav" data-v="-1" aria-label="Previous">\u2039</button><button class="ghost nb" data-a="today">Now</button><button class="ghost nb arr" data-a="nav" data-v="1" aria-label="Next">\u203A</button></span></div>${view.qa ? QUICKF : ''}${body}`;
 }
+const QUICKF = '<form class="qa" data-f="quick"><input type="text" name="q" placeholder="party thur 2pm, or oct 8 3-6pm big test" autocomplete="off" autocapitalize="off" required><button class="btn">Add</button><button class="ghost nb" type="button" data-a="qaclose">Cancel</button></form>';
 const errHtml = k => getSched().errs[k].map(([n, l]) => `<div>Line ${n} can't be read: ${esc(l)}${k === 'rtask' ? ' (needs a category tag at the end that already exists on the Tasks sheet, like [mech])' : ''}</div>`).join('');
 function editor(k, title, hint, form) {
   const txt = state.sched[k].t;
@@ -824,7 +832,7 @@ const when = `<input type="text" class="tm" name="s" placeholder="Start" require
 const ed = (k, form) => { const m = LIST_META.find(x => x[0] === k); return editor(k, m[1], m[2], form || ''); };
 function schedP() {
   const md = `<input type="text" class="sm" name="mo" placeholder="Month" autocapitalize="off" required><input type="number" class="dy" name="da" min="1" max="31" placeholder="Day" required>`;
-  const onceF = `<form data-f="once"><input type="text" class="desc" name="t" placeholder="Description" required>${md}${when}<button class="btn">Add</button></form>`;
+  const onceF = `<form data-f="quickb"><input type="text" class="desc" name="q" placeholder="party thur 2pm, or oct 8 3-6pm big test" autocomplete="off" autocapitalize="off" required><button class="btn">Add</button></form>`;
   const recF = `<form data-f="rec"><input type="text" class="desc" name="t" placeholder="Description" required><div class="dchk">${[1, 2, 3, 4, 5, 6, 0].map(i => `<label><input type="checkbox" name="d" value="${i}">${cap(DAYN[i])}</label>`).join('')}</div>${when}<button class="btn">Add</button></form>`;
   const bdayF = `<form data-f="bday"><input type="text" class="desc" name="t" placeholder="Name" required>${md}<input type="number" class="yr" name="yr" min="1900" max="2100" placeholder="Year"><button class="btn">Add</button></form>`;
   return `<div class="panel" id="calwrap">${calHtml()}</div><div class="cols2">${ed('once', onceF)}${ed('rec', recF)}</div>${ed('bday', bdayF)}`;
@@ -924,6 +932,8 @@ $app.addEventListener('click', e => {
   if (a === 'relaycopy') { const r = relay(); if (r) { const link = location.origin + location.pathname + '#relay=' + encodeURIComponent(JSON.stringify(r)); if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => toast('Link Copied'), () => prompt('Copy This Link', link)); else prompt('Copy This Link', link); } return; }
   if (a === 'relaydisc') { if (confirm('Disconnect always-on sync on this device?')) { localStorage.removeItem('dash-relay'); signedIn = false; status = 'offline'; render(true); } return; }
   if (a === 'relaycode') { const ta = $app.querySelector('textarea.code'); if (navigator.clipboard) navigator.clipboard.writeText(ta.value); else { ta.select(); document.execCommand('copy'); } toast('Code Copied'); return; }
+  if (a === 'qaopen') { view.qa = true; reCal(); const qi = $app.querySelector('form.qa input'); if (qi) qi.focus(); return; }
+  if (a === 'qaclose') { view.qa = false; reCal(); return; }
   if (a === 'addopen') { const bx = b.closest('.addbox'); bx.classList.add('open'); const f1 = bx.querySelector('input'); if (f1) f1.focus(); return; }
   if (a === 'signin') { if (reauth) return; return connect(known() ? '' : 'consent'); }
   if (a === 'backup') return backup();
@@ -956,6 +966,65 @@ $app.addEventListener('click', e => {
   changed();
 });
 const CODE = {1: 'm', 2: 't', 3: 'w', 4: 'th', 5: 'f', 6: 'sa', 0: 'su'}, t24 = v => { const [h, m] = v.split(':').map(Number); return h * 60 + m; };
+const QMON = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+const QDAY = {monday: 1, mon: 1, m: 1, tuesday: 2, tues: 2, tue: 2, tu: 2, t: 2, wednesday: 3, weds: 3, wed: 3, w: 3, thursday: 4, thurs: 4, thur: 4, thu: 4, th: 4, friday: 5, fri: 5, f: 5, saturday: 6, sat: 6, sa: 6, sunday: 0, sun: 0, su: 0};
+const QREL = {today: 0, tomorrow: 1, tmrw: 1, tmr: 1};
+const QEND = '(?=[\\s),;.!?]|$)';
+function parseQuick(raw) {
+  let s = ' ' + String(raw || '').toLowerCase().replace(/[\[\]]/g, ' ').replace(/[\u2013\u2014]/g, '-').replace(/(\d(?:\s*[ap]m)?)\s+to\s+(?=\d)/g, '$1-') + ' ';
+  const n = new Date(), today = new Date(n.getFullYear(), n.getMonth(), n.getDate()), nowMin = n.getHours() * 60 + n.getMinutes();
+  // time: needs am/pm (2 or 2-3 alone are not times)
+  const TRE = /(\s|\(|,|@)((?:at|from)\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?(?:\s*-\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?)(?=[\s),;.!?]|$)/g;
+  const times = []; let m, badTime = false;
+  while ((m = TRE.exec(s))) {
+    const body = m[3].trim(); if (!/[ap]m/.test(body)) continue;
+    const r = trange(body + ' '); if (!r || r.rest) { badTime = true; continue; }
+    times.push({s: r.s, e: r.e, from: m.index + m[1].length, to: m.index + m[0].length});
+  }
+  if (times.length > 1) return {err: 'Use just one time'};
+  const time = times[0] || null;
+  if (time) s = s.slice(0, time.from) + ' ' + s.slice(time.to);
+  // date: month + day, day + month, or m/d(/y)
+  const found = [], pre = '(\\s|\\(|,)(?:on\\s+)?';
+  const yr = v => v == null ? null : (+v < 100 ? 2000 + +v : +v);
+  const grab = (re, f) => { let x; while ((x = re.exec(s))) found.push({...f(x), from: x.index + x[1].length, to: x.index + x[0].length}); };
+  grab(new RegExp(pre + '(' + QMON + ')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?' + QEND, 'g'), x => ({mo: MON.indexOf(x[2].slice(0, 3)), da: +x[3], y: yr(x[4])}));
+  grab(new RegExp(pre + '(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(' + QMON + ')\\.?(?:,?\\s+(\\d{4}))?' + QEND, 'g'), x => ({mo: MON.indexOf(x[3].slice(0, 3)), da: +x[2], y: yr(x[4])}));
+  grab(new RegExp(pre + '(\\d{1,2})\\/(\\d{1,2})(?:\\/(\\d{2,4}))?' + QEND, 'g'), x => ({mo: +x[2] - 1, da: +x[3], y: yr(x[4])}));
+  if (found.length > 1) return {err: 'Use just one date'};
+  let date = null;
+  if (found.length) {
+    const f = found[0];
+    if (f.mo < 0 || f.mo > 11 || !dateOk(f.y || 2024, f.mo, f.da)) return {err: "That date doesn't exist"};
+    let y = f.y || today.getFullYear(); if (!f.y && new Date(y, f.mo, f.da) < today) y++;
+    if (!dateOk(y, f.mo, f.da)) return {err: "That date doesn't exist"};
+    date = new Date(y, f.mo, f.da);
+    s = s.slice(0, f.from) + ' ' + s.slice(f.to);
+  }
+  // weekday / today / tomorrow (the incoming one)
+  const WRE = new RegExp('(\\s|\\(|,)(?:(on|this|next)\\s+)?(' + Object.keys(QDAY).concat(Object.keys(QREL)).sort((a, b) => b.length - a.length).join('|') + ')' + QEND, 'g');
+  const days = []; while ((m = WRE.exec(s))) days.push({tok: m[3], nx: m[2] === 'next', from: m.index + m[1].length, to: m.index + m[0].length});
+  if (!date) {
+    if (days.length > 1) return {err: 'Use just one day (found ' + days.map(d => d.tok).join(' and ') + ')'};
+    if (days.length) {
+      const d = days[0];
+      if (d.tok in QREL) date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + QREL[d.tok]);
+      else { let add = (QDAY[d.tok] - today.getDay() + 7) % 7; if (add === 0 && (d.nx || (time && time.s <= nowMin))) add = 7; date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + add); }
+      s = s.slice(0, d.from) + ' ' + s.slice(d.to);
+    }
+  } else {
+    const d = days.find(x => x.tok.length >= 3 && QDAY[x.tok] === date.getDay());
+    if (d) s = s.slice(0, d.from) + ' ' + s.slice(d.to);
+  }
+  const text = s.replace(/\s+/g, ' ').replace(/^[\s,;:@\-.]+|[\s,;:@\-]+$/g, '').trim();
+  const missing = [];
+  if (!text) missing.push('a description');
+  if (!date) missing.push('a date (like thur, oct 8 or 10/8)');
+  if (!time) missing.push(badTime ? 'a valid time' : 'a time with am/pm (like 2pm or 2-3pm)');
+  if (missing.length) return {err: 'Add ' + missing.join(', ')};
+  const tr = fmtRange(time.s, time.e);
+  return {line: MON[date.getMonth()] + ' ' + date.getDate() + ' ' + tr + ' ' + text + ' [' + date.getFullYear() + ']', say: fmtL(date) + ' ' + tr + ' ' + text, date};
+}
 function mkLine(k, d) {
   const t = (d.get('t') || '').trim().toLowerCase(); let p = '', ytag = 0, cat = '';
   if (k === 'rec' || k === 'rtask') {
@@ -990,6 +1059,7 @@ function mkLine(k, d) {
 $app.addEventListener('submit', e => {
   e.preventDefault(); const f = e.target, k = f.dataset.f, d = new FormData(f), u = now();
   if (k === 'habit') addLine('habit', d.get('habit').trim().toLowerCase().replace(/\|/g, '') + ' |');
+  else if (k === 'quick' || k === 'quickb') { const r = parseQuick(d.get('q')); if (r.err) { toast(r.err); return; } addLine('once', r.line); view.qa = false; toast('Added: ' + r.say); }
   else { const line = mkLine(k, d); if (!line) return; addLine(k, line); }
   f.reset(); const bx = f.closest('.addbox'); if (bx) bx.classList.remove('open'); delete drafts[k];
   changed();
